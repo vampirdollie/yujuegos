@@ -110,7 +110,8 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Solo admins
     if not await es_admin(update, update.effective_user.id):
         await update.message.reply_text(
-            "🎲 ᛝ solo los administradores del grupo pueden crear juegos. ૮₍｡•̀ ﻌ •́｡₎ა"
+            "🎲 ᛝ solo los administradores del grupo "
+            "pueden crear juegos. ૮₍｡•̀ ﻌ •́｡₎ა"
         )
         return
 
@@ -147,7 +148,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⠀⠀jugadores: {max_jugadores}\n\n"
         f"⠀⠀usa /unirmejuego + emoji\n"
         f"⠀⠀para participar.\n\n"
-        f"⠀⠀esperando jugadores...",
+        f"⠀⠀esperando jugadores..."
     )
 
 
@@ -179,6 +180,8 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Solo admins
     if not await es_admin(update, update.effective_user.id):
         await update.message.reply_text(
+            "🎲 ᛝ solo los administradores pueden iniciar el juego. "
+            "૮₍｡•̀ ﻌ •́｡₎ა"
         )
         return
 
@@ -204,80 +207,65 @@ async def cancelarjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Solo admins
     if not await es_admin(update, update.effective_user.id):
         await update.message.reply_text(
-            "🎲 ᛝ solo los administradores pueden cancelar el juego. ૮꒰ “. . ꒱ა"
+            "🎲 ᛝ solo los administradores pueden cancelar "
+            "el juego. ૮꒰ “. . ꒱ა"
         )
         return
 
     await update.message.reply_text(
-        "🗑️ juego cancelado."
+        "🗑️ ᛝ juego cancelado."
     )
 
 
 # =========================================================
-# CONFIGURAR BOT
+# MAIN
 # =========================================================
 
-def main():
+app = Application.builder().token(TOKEN).build()
 
-    if not TOKEN:
-        raise ValueError(
-            "No se encontró TELEGRAM_TOKEN en las variables de entorno."
-        )
+app.add_handler(
+    CommandHandler("start", start)
+)
 
-    if not WEBHOOK_URL:
-        raise ValueError(
-            "No se encontró WEBHOOK_URL en las variables de entorno."
-        )
+app.add_handler(
+    CommandHandler("yucmds", cmds)
+)
 
-    application = (
-        Application.builder()
-        .token(TOKEN)
-        .build()
-    )
+app.add_handler(
+    CommandHandler("juegomesa", juegomesa)
+)
 
-    # =====================================================
-    # COMANDOS
-    # =====================================================
+app.add_handler(
+    CommandHandler("unirmejuego", unirmejuego)
+)
 
-    application.add_handler(
-        CommandHandler("start", start)
-    )
+app.add_handler(
+    CommandHandler("startjuego", startjuego)
+)
 
-    application.add_handler(
-        CommandHandler("cmds", cmds)
-    )
-
-    application.add_handler(
-        CommandHandler("juegomesa", juegomesa)
-    )
-
-    application.add_handler(
-        CommandHandler("unirmejuego", unirmejuego)
-    )
-
-    application.add_handler(
-        CommandHandler("startjuego", startjuego)
-    )
-
-    application.add_handler(
-        CommandHandler("cancelarjuego", cancelarjuego)
-    )
-
-    # =====================================================
-    # WEBHOOK
-    # =====================================================
-
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=TOKEN,
-        webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
-    )
+app.add_handler(
+    CommandHandler("cancelarjuego", cancelarjuego)
+)
 
 
 # =========================================================
-# EJECUTAR
+# WEBHOOK
 # =========================================================
 
-if __name__ == "__main__":
-    main()
+if not TOKEN:
+    raise ValueError(
+        "No se encontró TELEGRAM_TOKEN en las variables de entorno."
+    )
+
+if not WEBHOOK_URL:
+    raise ValueError(
+        "No se encontró WEBHOOK_URL en las variables de entorno."
+    )
+
+
+app.run_webhook(
+    listen="0.0.0.0",
+    port=PORT,
+    url_path=TOKEN,
+    webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
+)

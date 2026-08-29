@@ -1,6 +1,7 @@
 import os
 import logging
 import random
+import psycopg2
 
 from telegram import (
     Update,
@@ -28,6 +29,14 @@ PORT = int(os.environ.get("PORT", 10000))
 # URL pública de Render
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+def _get_conn():
+    return psycopg2.connect(
+        DATABASE_URL,
+        connect_timeout=10
+    )
+    
 # =========================================================
 # PARTIDA ACTIVA
 # =========================================================

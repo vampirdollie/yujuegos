@@ -1,11 +1,16 @@
 import os
 import logging
 
-from telegram import Update
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 
 from telegram.ext import (
     Application,
     CommandHandler,
+    CallbackQueryHandler,
     ContextTypes,
 )
 
@@ -186,7 +191,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["jugadores"] = []
 
     # Mensaje de la partida
-await update.message.reply_text(
+    await update.message.reply_text(
     f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
     f"⠀⠀premio: {robux} robux\n"
     f"⠀⠀jugadores: 0/{max_jugadores}\n\n"
@@ -261,18 +266,18 @@ async def unirmejuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         partida["max_jugadores"] - len(partida["jugadores"])
     )
 
-# Confirmación de unión
-username = update.effective_user.username
+    # Confirmación de unión
+    username = update.effective_user.username
 
-if username:
-    usuario = f"@{username}"
-else:
-    usuario = update.effective_user.full_name
+    if username:
+        usuario = f"@{username}"
+    else:
+        usuario = update.effective_user.full_name
 
-await update.message.reply_text(
-    f"{usuario} se ha unido con {emoji}.\n"
-    f"¡quedan {cupos_restantes} cupos!"
-)
+    await update.message.reply_text(
+        f"{usuario} se ha unido con {emoji}.\n"
+        f"¡quedan {cupos_restantes} cupos!"
+    )
 
 # =========================================================
 # /STARTJUEGO
@@ -295,11 +300,157 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    await update.message.reply_text(
-        "🎲 el juego comenzará aquí.\n"
-        "todavía estamos construyendo esta parte. 👀"
+    # Comprobar que exista una partida
+    if not partida["activa"]:
+        await update.message.reply_text(
+            "🎲 ᛝ no hay ninguna partida activa."
+        )
+        return
+
+    # Comprobar que la partida siga esperando
+    if partida["estado"] != "esperando":
+        await update.message.reply_text(
+            "🎲 ᛝ esta partida ya ha comenzado."
+        )
+        return
+
+    # Mínimo 3 jugadores
+    if len(partida["jugadores"]) < 3:
+        await update.message.reply_text(
+            "🎲 ᛝ se necesitan mínimo 3 jugadores para iniciar."
+        )
+        return
+
+    # Cambiar estado de la partida
+    partida["estado"] = "jugando"
+    partida["turno"] = 0
+
+    # Crear lista de jugadores
+    jugadores_texto = ""
+
+    for jugador in partida["jugadores"]:
+
+        if jugador["username"]:
+            usuario = f"@{jugador['username']}"
+        else:
+            usuario = jugador["nombre"]
+
+        jugadores_texto += (
+            f"{usuario} {jugador['emoji']}\n"
+        )
+
+    # Primer jugador
+    primer_jugador = partida["jugadores"][0]
+
+    if primer_jugador["username"]:
+        usuario_turno = f"@{primer_jugador['username']}"
+    else:
+        usuario_turno = primer_jugador["nombre"]
+
+    # Botón para lanzar el dado
+    boton_dado = InlineKeyboardButton(
+        "lanzar ‹𝟹",
+        callback_data="juego:lanzar"
     )
 
+    teclado = InlineKeyboardMarkup([
+        [boton_dado]
+    ])
+
+    # Mensaje de inicio
+    await update.message.reply_text(
+        f"🎲 ᛝ ¡la partida ha comenzado!\n\n"
+        f"{jugadores_texto}\n"
+        f"{usuario_turno} {primer_jugador['emoji']} "
+        f"lanza el dado, ¡suerte!",
+        reply_markup=teclado
+    )
+
+# =========================================================
+# BOTÓN: LANZAR DADO
+# =========================================================
+
+async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+
+    # Comprobar que exista una partida
+    if not partida["activa"]:
+        await query.answer(
+            "no hay una partida activa. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    # Comprobar que la partida esté jugando
+    if partida["estado"] != "jugando":
+        await query.answer(
+            "la partida todavía no ha comenzado. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    # Jugador al que le corresponde el turno
+    jugador_actual = partida["jugadores"][partida["turno"]]
+
+    # Comprobar que quien pulsó sea el jugador de turno
+    if query.from_user.id != jugador_actual["id"]:
+        await query.answer(
+            "no es tu turno. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    # Responder al botón
+    await query.answer()
+
+    # Lanzar dado
+    import random
+
+    resultado = random.randint(1, 6)
+
+    # Identificar jugador
+    if jugador_actual["username"]:
+        usuario = f"@{jugador_actual['username']}"
+    else:
+        usuario = jugador_actual["nombre"]
+
+    # Avisar resultado
+    await query.message.reply_text(
+        f"🎲 . . . {usuario} {jugador_actual['emoji']} "
+        f"ha sacado un {resultado}."
+    )
+
+    # Pasar al siguiente jugador
+    partida["turno"] += 1
+
+    # Si llegamos al final, volver al primero
+    if partida["turno"] >= len(partida["jugadores"]):
+        partida["turno"] = 0
+
+    siguiente_jugador = partida["jugadores"][partida["turno"]]
+
+    if siguiente_jugador["username"]:
+        siguiente_usuario = f"@{siguiente_jugador['username']}"
+    else:
+        siguiente_usuario = siguiente_jugador["nombre"]
+
+    # Botón para el siguiente turno
+    boton_dado = InlineKeyboardButton(
+        "lanzar ‹𝟹",
+        callback_data="juego:lanzar"
+    )
+
+    teclado = InlineKeyboardMarkup([
+        [boton_dado]
+    ])
+
+    # Avisar siguiente turno
+    await query.message.reply_text(
+        f"{siguiente_usuario} {siguiente_jugador['emoji']} "
+        f"lanza el dado, ¡suerte!",
+        reply_markup=teclado
+    )
 
 # =========================================================
 # /CANCELARJUEGO
@@ -357,6 +508,12 @@ app.add_handler(
     CommandHandler("cancelarjuego", cancelarjuego)
 )
 
+app.add_handler(
+    CallbackQueryHandler(
+        lanzar_dado,
+        pattern=r"^juego:lanzar$"
+    )
+)
 
 # =========================================================
 # WEBHOOK

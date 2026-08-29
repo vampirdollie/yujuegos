@@ -224,7 +224,6 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
         texto
     )
 
-
 # =========================================================
 # /JUEGOMESA
 # =========================================================
@@ -294,8 +293,10 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Crear partida
-    partida["activa"] = True
+    # =====================================================
+    # CREAR PARTIDA EN MEMORIA
+    # =====================================================
+
     partida["chat_id"] = update.effective_chat.id
     partida["premio"] = robux
     partida["max_jugadores"] = max_jugadores
@@ -306,18 +307,74 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["mensaje_turno"] = None
     partida["retroceso"] = None
 
-    # Guardar partida en Supabase
-    partida["id"] = guardar_partida()
+    # =====================================================
+    # GUARDAR EN SUPABASE
+    # =====================================================
 
-    # Mensaje de la partida
-    await update.message.reply_text(
-        f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
-        f"⠀⠀premio: {robux} robux\n"
-        f"⠀⠀jugadores: {max_jugadores}\n\n"
-        f"⠀⠀usa /unirmejuego + emoji\n"
-        f"⠀⠀para participar.\n\n"
-        f"⠀⠀esperando jugadores..."
+    try:
+
+        partida["id"] = guardar_partida()
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR EN JUEGOMESA AL GUARDAR: {e}"
+        )
+
+        # IMPORTANTE:
+        # si falla la base de datos,
+        # no dejamos una partida activa en memoria.
+        partida["activa"] = False
+        partida["chat_id"] = None
+        partida["premio"] = 0
+        partida["max_jugadores"] = 0
+        partida["jugadores"] = []
+        partida["estado"] = "esperando"
+        partida["turno"] = 0
+        partida["retroceso"] = None
+        partida["id"] = None
+
+        await update.message.reply_text(
+            "🎲 ᛝ ocurrió un error al guardar la partida.\n\n"
+            "revisa los logs del bot."
+        )
+
+        return
+
+    # =====================================================
+    # PARTIDA CREADA CORRECTAMENTE
+    # =====================================================
+
+    partida["activa"] = True
+
+    logger.info(
+        f"JUEGOMESA CREADO CORRECTAMENTE: "
+        f"id={partida['id']} "
+        f"chat={partida['chat_id']} "
+        f"premio={robux} "
+        f"jugadores={max_jugadores}"
     )
+
+    # =====================================================
+    # MENSAJE DE LA PARTIDA
+    # =====================================================
+
+    try:
+
+        await update.message.reply_text(
+            f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
+            f"⠀⠀premio: {robux} robux\n"
+            f"⠀⠀jugadores: {max_jugadores}\n\n"
+            f"⠀⠀usa /unirmejuego + emoji\n"
+            f"⠀⠀para participar.\n\n"
+            f"⠀⠀esperando jugadores..."
+        )
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR EN JUEGOMESA AL ENVIAR MENSAJE: {e}"
+        )
 
 # =========================================================
 # /UNIRMEJUEGO

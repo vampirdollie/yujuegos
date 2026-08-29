@@ -1726,10 +1726,10 @@ async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
 
     await update.message.reply_text(
-        f"🎰 ᛝ ¡RULETA!\n\n"
+        f"🎰 ᛝ ¡RULETA! ٩(^ᗜ^ )و ´-\n\n"
         f"premio: {premio} robux\n"
         f"tiempo: {duracion} segundos\n\n"
-        f"pulsa el botón para participar.",
+        f"pulsa el botón para entrar. ⤸",
         reply_markup=teclado
     )
 
@@ -1793,7 +1793,8 @@ async def unirse_ruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
         usuario = jugador["nombre"]
 
     await query.message.reply_text(
-        f"🎰 ᛝ {usuario} se ha unido a la ruleta. ♡\n\n"
+        f"🎰 ᛝ {usuario} se ha unido\n"
+        f" con exito a la ruleta. 𖹭\n"
         f"participantes: {len(ruleta['participantes'])}"
     )
 
@@ -1933,10 +1934,10 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=ruleta["chat_id"],
         text=(
-            f"🎰 ᛝ ¡ruleta terminada!\n\n"
-            f"ganador: {usuario}\n"
-            f"premio: {premio} robux\n\n"
-            f"¡felicidades! ૮₍˶ᵔ ᵕ ᵔ˶₎ა"
+            f"🎰 ᛝ ¡resultado listo!\n\n"
+            f"𖹭 ganador: {usuario}\n"
+            f"𖹭 premio: {premio} robux\n\n"
+            f"¡felicidades! ٩(ˊᗜˋ*)و "
         )
     )
 

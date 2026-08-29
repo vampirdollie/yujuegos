@@ -107,8 +107,6 @@ def guardar_partida():
         if conn:
             conn.close()
 
-    return partida_id
-
 # =========================================================
 # GUARDAR RULETA
 # =========================================================
@@ -397,7 +395,6 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/unirmejuego → unirte a una partida\n"
         "/startjuego → iniciar la partida\n"
         "/cancelarjuego → cancelar la partida\n"
-        "/limpiarmesa → borrar la partida guardada\n"
         "/limpiarmesa → borrar la partida guardada\n\n"
         "๑ 𝗥𝘂𝗹𝗲𝘁𝗮\n\n"
         "/yuruleta → iniciar una ruleta\n"
@@ -808,35 +805,39 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"a la casilla {nueva_posicion}."
     )
 
-if nueva_posicion == 51:
-
     # =====================================================
-    # GUARDAR GANADOR
+    # CASILLA 51 — GANADOR
     # =====================================================
 
-    try:
+    if nueva_posicion == 51:
 
-        guardar_ganador(jugador_actual)
+        # =================================================
+        # GUARDAR GANADOR
+        # =================================================
 
-    except Exception as e:
+        try:
 
-        logger.error(
-            f"ERROR GUARDANDO GANADOR: {e}"
+            guardar_ganador(jugador_actual)
+
+        except Exception as e:
+
+            logger.error(
+                f"ERROR GUARDANDO GANADOR: {e}"
+            )
+
+        await query.message.reply_text(
+            f"ꉂ(˵˃ ᗜ ˂˵) ᛝ ¡{usuario} "
+            f"{jugador_actual['emoji']} "
+            f"ha llegado a la casilla 51!\n\n"
+            f"¡ha ganado la partida! 🎉\n\n"
+            f"premio: {partida['premio']} robux"
         )
 
-    await query.message.reply_text(
-        f"ꉂ(˵˃ ᗜ ˂˵) ᛝ ¡{usuario} "
-        f"{jugador_actual['emoji']} "
-        f"ha llegado a la casilla 51!\n\n"
-        f"¡ha ganado la partida! 🎉\n\n"
-        f"premio: {partida['premio']} robux"
-    )
+        partida["activa"] = False
+        partida["estado"] = "finalizada"
+        partida["retroceso"] = None
 
-    partida["activa"] = False
-    partida["estado"] = "finalizada"
-    partida["retroceso"] = None
-
-    return
+        return
 
     # =====================================================
     # CASILLA 6 — AVANZA 3
@@ -1652,16 +1653,21 @@ async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Crear ruleta
+    # =====================================================
+    # CREAR RULETA EN MEMORIA
+    # =====================================================
+
     ruleta["activa"] = False
     ruleta["chat_id"] = update.effective_chat.id
     ruleta["premio"] = premio
     ruleta["duracion"] = duracion
     ruleta["participantes"] = []
-    ruleta["id"] = guardar_ruleta()
-    ruleta["activa"] = True
+    ruleta["id"] = None
 
-    # Guardar en Supabase
+    # =====================================================
+    # GUARDAR RULETA EN SUPABASE
+    # =====================================================
+
     try:
 
         ruleta["id"] = guardar_ruleta()
@@ -1672,6 +1678,7 @@ async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"ERROR EN YURULETA: {e}"
         )
 
+        ruleta["activa"] = False
         ruleta["id"] = None
         ruleta["chat_id"] = None
         ruleta["premio"] = 0
@@ -1685,9 +1692,13 @@ async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
+    # Activar solamente después de guardar correctamente
     ruleta["activa"] = True
 
-    # Botón para unirse
+    # =====================================================
+    # BOTÓN PARA UNIRSE
+    # =====================================================
+
     boton = InlineKeyboardButton(
         "unirme ‹𝟹",
         callback_data="ruleta:unirse"
@@ -1701,12 +1712,14 @@ async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎰 ᛝ ¡RULETA!\n\n"
         f"premio: {premio} robux\n"
         f"tiempo: {duracion} segundos\n\n"
-        f"pulsa el botón para participar."
-        f" ",
+        f"pulsa el botón para participar.",
         reply_markup=teclado
     )
 
-    # Programar finalización
+    # =====================================================
+    # PROGRAMAR FINALIZACIÓN
+    # =====================================================
+
     context.job_queue.run_once(
         finalizar_ruleta,
         duracion,
@@ -1887,6 +1900,13 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
             )
         )
 
+        # Limpiar memoria aunque haya fallado el guardado
+        ruleta["chat_id"] = None
+        ruleta["premio"] = 0
+        ruleta["duracion"] = 0
+        ruleta["participantes"] = []
+        ruleta["id"] = None
+
         return
 
     # =====================================================
@@ -1912,6 +1932,7 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
     ruleta["duracion"] = 0
     ruleta["participantes"] = []
     ruleta["id"] = None
+
 # =========================================================
 # /YUHISTORIAL
 # =========================================================

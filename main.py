@@ -51,6 +51,22 @@ ruleta = {
 }
 
 # =========================================================
+# REFLEJOS
+# =========================================================
+
+reflejos = {
+    "activa": False,
+    "id": None,
+    "chat_id": None,
+    "premio": 0,
+    "emojis": [],
+    "correcto": None,
+    "admin_id": None,
+    "mensaje_id": None,
+    "fase": None,
+}
+
+# =========================================================
 # GUARDAR PARTIDA EN SUPABASE
 # =========================================================
 
@@ -202,6 +218,62 @@ def guardar_ganador_ruleta(jugador, premio):
 
         logger.error(
             f"ERROR guardando ganador de ruleta: {e}"
+        )
+
+        raise
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+# =========================================================
+# GUARDAR GANADOR DE REFLEJOS
+# =========================================================
+
+def guardar_ganador_reflejos(jugador, premio):
+
+    conn = None
+    cur = None
+
+    try:
+
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO ganadores_ruleta (
+                ruleta_id,
+                chat_id,
+                user_id,
+                nombre,
+                username,
+                premio,
+                tipo
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            None,
+            reflejos["chat_id"],
+            jugador["id"],
+            jugador["nombre"],
+            jugador["username"],
+            premio,
+            "reflejos"
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR guardando ganador de reflejos: {e}"
         )
 
         raise
@@ -1746,6 +1818,180 @@ async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================================================
+# /REFLEJOS
+# =========================================================
+
+async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # Solo grupos
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "este comando solo puede utilizarse en un grupo."
+        )
+        return
+
+    # Solo admins
+    if not await es_admin(update, update.effective_user.id):
+        await update.message.reply_text(
+            "⚡ ᛝ solo los administradores pueden iniciar "
+            "un juego de reflejos. ૮₍｡•̀ ﻌ •́｡₎ა"
+        )
+        return
+
+    # Comprobar argumentos
+    if len(context.args) != 1:
+        await update.message.reply_text(
+            "uso:\n"
+            "/reflejos <robux>\n\n"
+            "ejemplo:\n"
+            "/reflejos 50"
+        )
+        return
+
+    try:
+        premio = int(context.args[0])
+
+    except ValueError:
+        await update.message.reply_text(
+            "debes colocar un número válido."
+        )
+        return
+
+    # Premio válido
+    if premio <= 0:
+        await update.message.reply_text(
+            "el premio debe ser mayor que 0."
+        )
+        return
+
+    # No permitir otro juego activo
+    if reflejos["activa"]:
+        await update.message.reply_text(
+            "⚡ ᛝ ya hay un juego de reflejos activo."
+        )
+        return
+
+    # Guardar configuración inicial
+    reflejos["chat_id"] = update.effective_chat.id
+    reflejos["premio"] = premio
+    reflejos["admin_id"] = update.effective_user.id
+    reflejos["emojis"] = []
+    reflejos["correcto"] = None
+    reflejos["mensaje_id"] = None
+    reflejos["fase"] = "esperando_emojis"
+
+    # Todavía no está activo en el grupo
+    reflejos["activa"] = False
+
+    # Intentar escribirle al admin por privado
+    try:
+
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
+            text=(
+                "⚡ ᛝ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗿𝗲𝗳𝗹𝗲𝗷𝗼𝘀\n\n"
+                f"premio: {premio} robux\n\n"
+                "envíame ahora los 5 emojis que quieres usar.\n\n"
+                "ejemplo:\n"
+                "🐶 🐱 🐰 🐼 🦊"
+            )
+        )
+
+        await update.message.reply_text(
+            "⚡ ᛝ te envié un mensaje privado para configurar "
+            "el juego."
+        )
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR ENVIANDO CONFIGURACIÓN DE REFLEJOS: {e}"
+        )
+
+        # Limpiar configuración
+        reflejos["chat_id"] = None
+        reflejos["premio"] = 0
+        reflejos["admin_id"] = None
+        reflejos["emojis"] = []
+        reflejos["correcto"] = None
+        reflejos["mensaje_id"] = None
+        reflejos["fase"] = None
+
+        await update.message.reply_text(
+            "⚡ ᛝ no pude enviarte el mensaje privado.\n\n"
+            "asegúrate de haber iniciado una conversación "
+            "con el bot primero."
+        )
+
+# =========================================================
+# RECIBIR EMOJIS DE REFLEJOS
+# =========================================================
+
+async def recibir_emojis_reflejos(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    # Solo mensajes privados
+    if update.effective_chat.type != "private":
+        return
+
+    # Comprobar que haya una configuración esperando
+    if reflejos["fase"] != "esperando_emojis":
+        return
+
+    # Solo el admin que inició el juego
+    if update.effective_user.id != reflejos["admin_id"]:
+        return
+
+    texto = update.message.text.strip()
+
+    # Separar los emojis por espacios
+    emojis = texto.split()
+
+    # Deben ser exactamente 5
+    if len(emojis) != 5:
+        await update.message.reply_text(
+            "⚡ ᛝ necesito exactamente 5 emojis.\n\n"
+            "envíalos separados por espacios.\n\n"
+            "ejemplo:\n"
+            "🐶 🐱 🐰 🐼 🦊"
+        )
+        return
+
+    # No permitir emojis repetidos
+    if len(set(emojis)) != 5:
+        await update.message.reply_text(
+            "⚡ ᛝ los 5 emojis deben ser diferentes."
+        )
+        return
+
+    # Guardar emojis
+    reflejos["emojis"] = emojis
+    reflejos["fase"] = "elegir_correcto"
+
+    # Crear botones para elegir el correcto
+    botones = []
+
+    for emoji in emojis:
+
+        botones.append([
+            InlineKeyboardButton(
+                emoji,
+                callback_data=f"reflejos:correcto:{emoji}"
+            )
+        ])
+
+    teclado = InlineKeyboardMarkup(botones)
+
+    await update.message.reply_text(
+        "⚡ ᛝ perfecto.\n\n"
+        "ahora elige cuál de estos 5 emojis "
+        "será el correcto:",
+        reply_markup=teclado
+    )
+
+# =========================================================
 # BOTÓN: UNIRSE A RULETA
 # =========================================================
 
@@ -2134,6 +2380,10 @@ app.add_handler(
 
 app.add_handler(
     CommandHandler("yuruleta", yuruleta)
+)
+
+app.add_handler(
+    CommandHandler("reflejos", reflejos_comando)
 )
 
 app.add_handler(

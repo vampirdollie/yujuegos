@@ -1,16 +1,11 @@
 import os
 import logging
 
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-)
+from telegram import Update
 
 from telegram.ext import (
     Application,
     CommandHandler,
-    CallbackQueryHandler,
     ContextTypes,
 )
 
@@ -82,7 +77,7 @@ async def es_admin(update: Update, user_id: int) -> bool:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "𖹭 ¡holaa! soy yujuega 🎲\n\n"
+        "𖹭 ¡holaa! ₍₍⚞(˶>ᗜ<˶)⚟⁾⁾\n\n"
         "aquí podrás participar en diferentes juegos.\n\n"
         "usa /yucmds para ver los comandos disponibles."
     )
@@ -97,7 +92,7 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = (
         "𖹭 𝗖𝗼𝗺𝗮𝗻𝗱𝗼𝘀\n\n"
 
-        "/start → bienvenida\n"
+        "/yustart → bienvenida\n"
         "/yucmds → lista de comandos\n\n"
 
         "๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n"
@@ -188,36 +183,15 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["max_jugadores"] = max_jugadores
     partida["jugadores"] = []
 
-    # Botón para unirse
-    boton_unirse = InlineKeyboardButton(
-        "unirme ‹𝟹",
-        callback_data="juego:unirse"
-    )
-
-    teclado = InlineKeyboardMarkup([
-        [boton_unirse]
-    ])
-
     # Mensaje de la partida
-    await update.message.reply_text(
-        f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
-        f"⠀⠀premio: {robux} robux\n"
-        f"⠀⠀jugadores: 0/{max_jugadores}\n\n"
-        f"⠀⠀¡pulsa el botón para participar!\n\n"
-        f"⠀⠀esperando jugadores...",
-        reply_markup=teclado
-    )
-# =========================================================
-# /UNIRMEJUEGO
-# =========================================================
-
-async def unirmejuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    await update.message.reply_text(
-        "💘 te has unido al juego.\n"
-        "la lógica de jugadores la agregaremos aquí."
-    )
-
+await update.message.reply_text(
+    f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
+    f"⠀⠀premio: {robux} robux\n"
+    f"⠀⠀jugadores: 0/{max_jugadores}\n\n"
+    f"⠀⠀usa /unirmejuego + emoji\n"
+    f"⠀⠀para participar.\n\n"
+    f"⠀⠀esperando jugadores..."
+)
 
 # =========================================================
 # /STARTJUEGO
@@ -279,7 +253,7 @@ async def cancelarjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(
-    CommandHandler("start", start)
+    CommandHandler("yustart", start)
 )
 
 app.add_handler(

@@ -467,23 +467,23 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-# =====================================================
-# CASILLA 6 — AVANZA 3
-# =====================================================
+    # =====================================================
+    # CASILLA 6 — AVANZA 3
+    # =====================================================
 
-if jugador_actual["posicion"] == 6:
+    if jugador_actual["posicion"] == 6:
 
-    posicion_especial = 9
+        posicion_especial = 9
 
-    jugador_actual["posicion"] = posicion_especial
+        jugador_actual["posicion"] = posicion_especial
 
-    await query.message.reply_text(
-        f"🟣 ᛝ ¡AVANZA 3 CASILLAS! "
-        f"⸜(｡˃ ᵕ ˂ )⸝\n\n"
-        f"{usuario} {jugador_actual['emoji']} "
-        f"avanza de la casilla 6 "
-        f"a la casilla {posicion_especial}."
-    )
+        await query.message.reply_text(
+            f"🟣 ᛝ ¡AVANZA 3 CASILLAS! "
+            f"⸜(｡˃ ᵕ ˂ )⸝\n\n"
+            f"{usuario} {jugador_actual['emoji']} "
+            f"avanza de la casilla 6 "
+            f"a la casilla {posicion_especial}."
+        )
 
     # =====================================================
     # CASILLA 14 — DADO EXTRA
@@ -498,7 +498,6 @@ if jugador_actual["posicion"] == 6:
             f"tiene la oportunidad de lanzar otra vez."
         )
 
-        # Mantener el turno del mismo jugador
         partida["turno_id"] += 1
 
         await enviar_turno(
@@ -533,7 +532,6 @@ if jugador_actual["posicion"] == 6:
 
         for jugador in partida["jugadores"]:
 
-            # No puede elegirse a sí mismo
             if jugador["id"] == jugador_actual["id"]:
                 continue
 

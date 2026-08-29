@@ -1,5 +1,6 @@
 import os
 import logging
+import random
 
 from telegram import (
     Update,
@@ -259,6 +260,9 @@ async def unirmejuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "nombre": update.effective_user.full_name,
         "username": update.effective_user.username,
         "emoji": emoji
+        "posicion": 0,
+        "escudo": False,
+        "perder_turno": False
     })
 
     # Calcular cupos restantes

@@ -195,7 +195,7 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/juegomesa → crear una partida\n"
         "/unirmejuego → unirte a una partida\n"
         "/startjuego → iniciar la partida\n"
-        "/cancelarjuego → cancelar la partida"
+        "/cancelarjuego → cancelar la partida\n"
         "/limpiarmesa → borrar la partida guardada"
     )
 
@@ -1162,7 +1162,7 @@ async def cancelarjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🗑️ ᛝ juego cancelado."
     )
 
-# =========================================================
+#=========================================================
 # /LIMPIARMESA
 # =========================================================
 
@@ -1190,7 +1190,7 @@ async def limpiarmesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-        # Eliminar la partida de Supabase
+    # Eliminar la partida de Supabase
     conn = _get_conn()
     cur = conn.cursor()
 

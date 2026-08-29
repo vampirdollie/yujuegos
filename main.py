@@ -106,7 +106,7 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/yustart → bienvenida\n"
         "/yucmds → lista de comandos\n\n"
 
-        "๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n"
+        "๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
         "/juegomesa → crear una partida\n"
         "/unirmejuego → unirte a una partida\n"
         "/startjuego → iniciar la partida\n"
@@ -203,7 +203,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
     f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
     f"⠀⠀premio: {robux} robux\n"
-    f"⠀⠀jugadores: 0/{max_jugadores}\n\n"
+    f"⠀⠀jugadores: {max_jugadores}\n\n"
     f"⠀⠀usa /unirmejuego + emoji\n"
     f"⠀⠀para participar.\n\n"
     f"⠀⠀esperando jugadores..."

@@ -259,7 +259,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Máximo 10 jugadores
+    # Máximo 101 jugadores
     if max_jugadores > 11:
         await update.message.reply_text(
             "el juego permite máximo 11 jugadores."

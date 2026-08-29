@@ -193,6 +193,12 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["premio"] = robux
     partida["max_jugadores"] = max_jugadores
     partida["jugadores"] = []
+    # Crear partida
+    partida["estado"] = "esperando"
+    partida["turno"] = 0
+    partida["turno_id"] += 1
+    partida["mensaje_turno"] = None
+    partida["retroceso"] = None
 
     # Mensaje de la partida
     await update.message.reply_text(

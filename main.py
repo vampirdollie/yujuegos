@@ -447,7 +447,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_photo(
         photo="yustart.jpg",
         caption=(
-            "⠀⠀⠀⠀⠀⠀¡holi, jugador! (  ≧ᗜ≦)\n\n"
+            "⠀⠀⠀⠀⠀⠀⠀¡holi, jugador! (  ≧ᗜ≦)\n\n"
             "⠀⠀⠀⠀⠀⠀aquí podrás participar\n"
             "⠀⠀⠀⠀⠀⠀en diferentes juegos.\n\n"
             "⠀⠀⠀๑ para conocer los comandos\n"

@@ -448,11 +448,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo="yustart.jpg",
         caption=(
             "⠀⠀⠀\n"
-            "⠀⠀⠀⠀⠀⠀⠀¡holi, personita! ₍₍⚞(˶>ᗜ<˶)⚟⁾⁾\n\n"
-            "⠀⠀⠀⠀⠀⠀⠀⠀aquí podrás participar\n"
-            "⠀⠀⠀⠀⠀⠀⠀⠀en diferentes juegos.\n\n"
-            "⠀⠀⠀⠀⠀⠀๑ para conocer los comandos\n"
-            "⠀⠀⠀⠀⠀⠀⠀⠀usa /yucmds\n"
+            "⠀⠀⠀⠀⠀¡holi, personita! ₍₍⚞(˶>ᗜ<˶)⚟⁾⁾\n\n"
+            "⠀⠀⠀⠀⠀⠀⠀aquí podrás participar\n"
+            "⠀⠀⠀⠀⠀⠀⠀en diferentes juegos.\n\n"
+            "⠀⠀⠀⠀⠀๑ para conocer los comandos\n"
+            "⠀⠀⠀⠀⠀⠀⠀usa /yucmds\n"
             "⠀⠀⠀\n"
         )
     )

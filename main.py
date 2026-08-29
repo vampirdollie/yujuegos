@@ -13,7 +13,9 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
     ContextTypes,
+    filters,
 )
 
 
@@ -2725,6 +2727,13 @@ app.add_handler(
 
 app.add_handler(
     CommandHandler("limpiarhistorial", limpiarhistorial)
+)
+
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & filters.ChatType.PRIVATE,
+        recibir_emojis_reflejos
+    )
 )
 
 app.add_handler(

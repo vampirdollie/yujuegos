@@ -467,51 +467,23 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    # =====================================================
-    # CASILLA 6 — AVANZA 3
-    # =====================================================
+# =====================================================
+# CASILLA 6 — AVANZA 3
+# =====================================================
 
-    if jugador_actual["posicion"] == 6:
+if jugador_actual["posicion"] == 6:
 
-        posicion_anterior = jugador_actual["posicion"]
-        posicion_especial = posicion_anterior + 3
+    posicion_especial = 9
 
-        if posicion_especial <= 51:
+    jugador_actual["posicion"] = posicion_especial
 
-            jugador_actual["posicion"] = posicion_especial
-
-            await query.message.reply_text(
-                f"🟣 ᛝ ¡AVANZA 3 CASILLAS! "
-                f"⸜(｡˃ ᵕ ˂ )⸝\n\n"
-                f"{usuario} {jugador_actual['emoji']} "
-                f"avanza de la casilla {posicion_anterior} "
-                f"a la casilla {posicion_especial}."
-            )
-
-            # Comprobar si llegó a 51 gracias al avance especial
-            if posicion_especial == 51:
-
-                await query.message.reply_text(
-                    f"ꉂ(˵˃ ᗜ ˂˵) ᛝ ¡{usuario} "
-                    f"{jugador_actual['emoji']} "
-                    f"ha llegado a la casilla 51!\n\n"
-                    f"¡ha ganado la partida! 🎉"
-                )
-
-                partida["activa"] = False
-                partida["estado"] = "finalizada"
-                partida["retroceso"] = None
-
-                return
-
-        else:
-
-            await query.message.reply_text(
-                f"🟣 ᛝ ¡AVANZA 3 CASILLAS! "
-                f"⸜(｡˃ ᵕ ˂ )⸝\n\n"
-                f"no puede avanzar porque "
-                f"superaría la casilla 51."
-            )
+    await query.message.reply_text(
+        f"🟣 ᛝ ¡AVANZA 3 CASILLAS! "
+        f"⸜(｡˃ ᵕ ˂ )⸝\n\n"
+        f"{usuario} {jugador_actual['emoji']} "
+        f"avanza de la casilla 6 "
+        f"a la casilla {posicion_especial}."
+    )
 
     # =====================================================
     # CASILLA 14 — DADO EXTRA

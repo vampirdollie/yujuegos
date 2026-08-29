@@ -55,12 +55,6 @@ ruleta = {
 # =========================================================
 
 def guardar_partida():
-
-# =========================================================
-# GUARDAR PARTIDA EN SUPABASE
-# =========================================================
-
-def guardar_partida():
     conn = None
     cur = None
 
@@ -404,7 +398,11 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/startjuego → iniciar la partida\n"
         "/cancelarjuego → cancelar la partida\n"
         "/limpiarmesa → borrar la partida guardada\n"
-        "/limpiarmesa → borrar la partida guardada"
+        "/limpiarmesa → borrar la partida guardada\n\n"
+        "๑ 𝗥𝘂𝗹𝗲𝘁𝗮\n\n"
+        "/yuruleta → iniciar una ruleta\n"
+        "/yuhistorial → ver ganancias acumuladas\n"
+        "/limpiarhistorial → borrar el historial\n"
     )
 
     await update.message.reply_text(
@@ -1655,10 +1653,13 @@ async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Crear ruleta
+    ruleta["activa"] = False
     ruleta["chat_id"] = update.effective_chat.id
     ruleta["premio"] = premio
     ruleta["duracion"] = duracion
     ruleta["participantes"] = []
+    ruleta["id"] = guardar_ruleta()
+    ruleta["activa"] = True
 
     # Guardar en Supabase
     try:
@@ -1781,10 +1782,52 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
     if datos["ruleta_id"] != ruleta["id"]:
         return
 
-    # Desactivar
+    # =====================================================
+    # DESACTIVAR RULETA EN MEMORIA Y SUPABASE
+    # =====================================================
+
     ruleta["activa"] = False
 
-    # Sin participantes
+    conn = None
+    cur = None
+
+    try:
+
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE ruletas
+            SET activa = FALSE,
+                finalizada_en = NOW()
+            WHERE id = %s
+        """, (
+            ruleta["id"],
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR actualizando ruleta finalizada: {e}"
+        )
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+    # =====================================================
+    # SIN PARTICIPANTES
+    # =====================================================
+
     if not ruleta["participantes"]:
 
         await context.bot.send_message(
@@ -1795,6 +1838,7 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
             )
         )
 
+        # Limpiar memoria
         ruleta["chat_id"] = None
         ruleta["premio"] = 0
         ruleta["duracion"] = 0
@@ -1803,7 +1847,10 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    # Elegir ganador
+    # =====================================================
+    # ELEGIR GANADOR
+    # =====================================================
+
     ganador = random.choice(
         ruleta["participantes"]
     )
@@ -1815,7 +1862,10 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
     else:
         usuario = ganador["nombre"]
 
-    # Guardar ganador
+    # =====================================================
+    # GUARDAR GANADOR
+    # =====================================================
+
     try:
 
         guardar_ganador_ruleta(
@@ -1839,7 +1889,10 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    # Anunciar
+    # =====================================================
+    # ANUNCIAR GANADOR
+    # =====================================================
+
     await context.bot.send_message(
         chat_id=ruleta["chat_id"],
         text=(
@@ -1850,13 +1903,15 @@ async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
         )
     )
 
-    # Limpiar memoria
+    # =====================================================
+    # LIMPIAR MEMORIA
+    # =====================================================
+
     ruleta["chat_id"] = None
     ruleta["premio"] = 0
     ruleta["duracion"] = 0
     ruleta["participantes"] = []
     ruleta["id"] = None
-
 # =========================================================
 # /YUHISTORIAL
 # =========================================================

@@ -1890,9 +1890,9 @@ async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_user.id,
             text=(
                 "⚡ ᛝ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗿𝗲𝗳𝗹𝗲𝗷𝗼𝘀\n\n"
-                f"premio: {premio} robux\n\n"
-                "envíame ahora los 5 emojis que quieres usar.\n\n"
-                "ejemplo:\n"
+                f"๑ premio: {premio} robux\n\n"
+                "envíame los 5 emojis que vamos a usar.\n"
+                "๑ ejemplo:\n"
                 "🐶 🐱 🐰 🐼 🦊"
             )
         )
@@ -1953,7 +1953,7 @@ async def recibir_emojis_reflejos(
     if len(emojis) != 5:
         await update.message.reply_text(
             "⚡ ᛝ necesito exactamente 5 emojis.\n\n"
-            "envíalos separados por espacios.\n\n"
+            "envíalos separados por espacios.\n"
             "ejemplo:\n"
             "🐶 🐱 🐰 🐼 🦊"
         )
@@ -1989,6 +1989,318 @@ async def recibir_emojis_reflejos(
         "ahora elige cuál de estos 5 emojis "
         "será el correcto:",
         reply_markup=teclado
+    )
+
+# =========================================================
+# ELEGIR EMOJI CORRECTO
+# =========================================================
+
+async def elegir_correcto_reflejos(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    # Solo aceptar durante la selección del emoji
+    if reflejos["fase"] != "elegir_correcto":
+        await query.answer(
+            "esta configuración ya terminó. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    # Solo el admin que inició el juego
+    if query.from_user.id != reflejos["admin_id"]:
+        await query.answer(
+            "solo el admin que creó el juego puede elegirlo.",
+            show_alert=True
+        )
+        return
+
+    # Obtener emoji seleccionado
+    try:
+        emoji_correcto = query.data.split(":", 2)[2]
+    except (IndexError, AttributeError):
+        await query.answer(
+            "no pude identificar el emoji.",
+            show_alert=True
+        )
+        return
+
+    # Comprobar que el emoji esté entre los 5
+    if emoji_correcto not in reflejos["emojis"]:
+        await query.answer(
+            "ese emoji no pertenece a este juego.",
+            show_alert=True
+        )
+        return
+
+    await query.answer(
+        "¡emoji correcto seleccionado! ♡"
+    )
+
+    # Guardar el correcto
+    reflejos["correcto"] = emoji_correcto
+
+    # Activar juego
+    reflejos["activa"] = True
+    reflejos["fase"] = "activo"
+
+    # =====================================================
+    # CREAR BOTONES PARA EL GRUPO
+    # =====================================================
+
+    botones = []
+
+    for emoji in reflejos["emojis"]:
+
+        botones.append([
+            InlineKeyboardButton(
+                emoji,
+                callback_data=f"reflejos:jugar:{emoji}"
+            )
+        ])
+
+    teclado = InlineKeyboardMarkup(botones)
+
+    # =====================================================
+    # ENVIAR JUEGO AL GRUPO
+    # =====================================================
+
+    try:
+
+        mensaje = await context.bot.send_message(
+            chat_id=reflejos["chat_id"],
+            text=(
+                "⚡ ᛝ 𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦\n\n"
+                f"premio: {reflejos['premio']} robux\n\n"
+                "elige el emoji correcto. . .\n\n"
+                "¡rápido!"
+            ),
+            reply_markup=teclado
+        )
+
+        reflejos["mensaje_id"] = mensaje.message_id
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR PUBLICANDO REFLEJOS EN EL GRUPO: {e}"
+        )
+
+        # Si no pudo publicarlo, cancelar la partida
+        reflejos["activa"] = False
+        reflejos["fase"] = None
+        reflejos["chat_id"] = None
+        reflejos["premio"] = 0
+        reflejos["emojis"] = []
+        reflejos["correcto"] = None
+        reflejos["admin_id"] = None
+        reflejos["mensaje_id"] = None
+
+        await query.message.reply_text(
+            "⚡ ᛝ ocurrió un error al publicar "
+            "el juego en el grupo."
+        )
+
+        return
+
+    # =====================================================
+    # CONFIRMACIÓN PRIVADA AL ADMIN
+    # =====================================================
+
+    await query.message.reply_text(
+        "⚡ ᛝ ¡listo!\n\n"
+        "el juego ya fue publicado en el grupo. 𖹭"
+    )
+
+# =========================================================
+# BOTÓN: JUGAR REFLEJOS
+# =========================================================
+
+async def jugar_reflejos(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    # Comprobar que el juego siga activo
+    if not reflejos["activa"]:
+        await query.answer(
+            "este juego ya terminó. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    # Obtener el emoji seleccionado
+    try:
+        emoji_elegido = query.data.split(":", 2)[2]
+    except (IndexError, AttributeError):
+        await query.answer(
+            "no pude identificar el emoji.",
+            show_alert=True
+        )
+        return
+
+    # Comprobar que el emoji pertenezca al juego
+    if emoji_elegido not in reflejos["emojis"]:
+        await query.answer(
+            "ese emoji no pertenece a este juego.",
+            show_alert=True
+        )
+        return
+
+    # =====================================================
+    # RESPUESTA INCORRECTA
+    # =====================================================
+
+    if emoji_elegido != reflejos["correcto"]:
+
+        await query.answer(
+            "❌ incorrecto, ¡sigue intentando!",
+            show_alert=True
+        )
+
+        return
+
+    # =====================================================
+    # GANADOR
+    # =====================================================
+
+    # Desactivar inmediatamente
+    # para evitar que dos personas ganen
+    reflejos["activa"] = False
+    reflejos["fase"] = "finalizado"
+
+    jugador = {
+        "id": query.from_user.id,
+        "nombre": query.from_user.full_name,
+        "username": query.from_user.username
+    }
+
+    premio = reflejos["premio"]
+
+    if jugador["username"]:
+        usuario = f"@{jugador['username']}"
+    else:
+        usuario = jugador["nombre"]
+
+    # Responder al botón
+    await query.answer(
+        "⚡ ¡CORRECTO! ¡GANASTE! ♡",
+        show_alert=True
+    )
+
+    # =====================================================
+    # GUARDAR GANADOR
+    # =====================================================
+
+    try:
+
+        guardar_ganador_reflejos(
+            jugador,
+            premio
+        )
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR GUARDANDO GANADOR DE REFLEJOS: {e}"
+        )
+
+        await context.bot.send_message(
+            chat_id=reflejos["chat_id"],
+            text=(
+                "⚡ ᛝ ocurrió un error al guardar "
+                "el resultado del juego."
+            )
+        )
+
+        # Limpiar memoria
+        reflejos["activa"] = False
+        reflejos["fase"] = None
+        reflejos["chat_id"] = None
+        reflejos["premio"] = 0
+        reflejos["emojis"] = []
+        reflejos["correcto"] = None
+        reflejos["admin_id"] = None
+        reflejos["mensaje_id"] = None
+
+        return
+
+    # =====================================================
+    # ANUNCIAR GANADOR
+    # =====================================================
+
+    await context.bot.send_message(
+        chat_id=reflejos["chat_id"],
+        text=(
+            f"⚡ ᛝ ¡𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦 𝗧𝗘𝗥𝗠𝗜𝗡𝗔𝗗𝗢!\n\n"
+            f"𖹭 ganador: {usuario}\n"
+            f"𖹭 premio: {premio} robux\n\n"
+            f"¡qué reflejos! ᕙ(  •̀ ᗜ •́  )ᕗ"
+        )
+    )
+
+    # =====================================================
+    # LIMPIAR MEMORIA
+    # =====================================================
+
+    reflejos["chat_id"] = None
+    reflejos["premio"] = 0
+    reflejos["emojis"] = []
+    reflejos["correcto"] = None
+    reflejos["admin_id"] = None
+    reflejos["mensaje_id"] = None
+
+# =========================================================
+# /STOPREFLEJOS
+# =========================================================
+
+async def stopreflejos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # Solo grupos
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "este comando solo puede utilizarse en un grupo."
+        )
+        return
+
+    # Solo admins
+    if not await es_admin(update, update.effective_user.id):
+        await update.message.reply_text(
+            "⚡ ᛝ solo los administradores pueden detener "
+            "el juego de reflejos. ૮꒰ “. . ꒱ა"
+        )
+        return
+
+    # Comprobar que exista un juego activo
+    if not reflejos["activa"]:
+        await update.message.reply_text(
+            "⚡ ᛝ no hay ningún juego de reflejos activo."
+        )
+        return
+
+    # Guardar el chat antes de limpiar
+    chat_id = reflejos["chat_id"]
+
+    # Detener juego
+    reflejos["activa"] = False
+    reflejos["fase"] = "cancelado"
+
+    # Limpiar configuración
+    reflejos["chat_id"] = None
+    reflejos["premio"] = 0
+    reflejos["emojis"] = []
+    reflejos["correcto"] = None
+    reflejos["admin_id"] = None
+    reflejos["mensaje_id"] = None
+
+    await update.message.reply_text(
+        "🛑 ᛝ ¡juego de reflejos detenido!\n\n"
+        "la partida ha sido cancelada."
     )
 
 # =========================================================
@@ -2216,9 +2528,10 @@ async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id,
                 nombre,
                 username,
+                tipo,
                 SUM(premio) AS total
             FROM ganadores_ruleta
-            GROUP BY user_id, nombre, username
+            GROUP BY user_id, nombre, username, tipo
             ORDER BY total DESC
         """)
 
@@ -2231,7 +2544,7 @@ async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(
-            "🎰 ᛝ ocurrió un error al consultar "
+            "๑ ᛝ ocurrió un error al consultar "
             "el historial."
         )
 
@@ -2245,30 +2558,46 @@ async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
+    # =====================================================
+    # SIN GANADORES
+    # =====================================================
+
     if not resultados:
 
         await update.message.reply_text(
-            "🎰 ᛝ todavía no hay ganadores registrados."
+            "๑ ᛝ todavía no hay ganadores registrados."
         )
 
         return
 
+    # =====================================================
+    # CREAR MENSAJE
+    # =====================================================
+
     texto = (
-        "🎰 ᛝ 𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹 𝗱𝗲 𝗥𝘂𝗹𝗲𝘁𝗮𝘀\n\n"
+        "⠀⠀𖹭 𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹\n\n"
     )
 
-    for posicion, resultado in enumerate(resultados, start=1):
+    for resultado in resultados:
 
-        user_id, nombre, username, total = resultado
+        user_id, nombre, username, tipo, total = resultado
 
         if username:
             usuario = f"@{username}"
         else:
             usuario = nombre
 
+        # Identificar juego
+        if tipo == "reflejos":
+            icono = "𖹭"
+            nombre_juego = "reflejos"
+        else:
+            icono = "๑"
+            nombre_juego = "ruleta"
+
         texto += (
-            f"{posicion}. {usuario} → "
-            f"{total} robux\n"
+            f"{icono} {usuario} → {total} robux\n"
+            f"   {nombre_juego}\n\n"
         )
 
     await update.message.reply_text(
@@ -2387,6 +2716,10 @@ app.add_handler(
 )
 
 app.add_handler(
+    CommandHandler("stopreflejos", stopreflejos)
+)
+
+app.add_handler(
     CommandHandler("yuhistorial", yuhistorial)
 )
 
@@ -2419,6 +2752,20 @@ app.add_handler(
     CallbackQueryHandler(
         unirse_ruleta,
         pattern=r"^ruleta:unirse$"
+    )
+)
+
+app.add_handler(
+    CallbackQueryHandler(
+        elegir_correcto_reflejos,
+        pattern=r"^reflejos:correcto:"
+    )
+)
+
+app.add_handler(
+    CallbackQueryHandler(
+        jugar_reflejos,
+        pattern=r"^reflejos:jugar:"
     )
 )
 

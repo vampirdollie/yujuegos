@@ -2075,9 +2075,9 @@ async def elegir_correcto_reflejos(
         mensaje = await context.bot.send_message(
             chat_id=reflejos["chat_id"],
             text=(
-                "⚡ ᛝ 𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦\n\n"
-                f"premio: {reflejos['premio']} robux\n\n"
-                "elige el emoji correcto. . .\n\n"
+                "⚡ ᛝ 𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦\n"
+                f"⠀๑ premio: {reflejos['premio']} robux\n\n"
+                "elige el emoji correcto. . .\\n"
                 "¡rápido!"
             ),
             reply_markup=teclado
@@ -2113,7 +2113,7 @@ async def elegir_correcto_reflejos(
     # =====================================================
 
     await query.message.reply_text(
-        "⚡ ᛝ ¡listo!\n\n"
+        "⚡ ᛝ ¡listo!\n"
         "el juego ya fue publicado en el grupo. 𖹭"
     )
 
@@ -2577,7 +2577,7 @@ async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =====================================================
 
     texto = (
-        "⠀⠀𖹭 𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹\n\n"
+        "⠀⠀𖹭 ⠀⠀⠀𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹\n\n"
     )
 
     for resultado in resultados:

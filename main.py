@@ -1,10 +1,16 @@
 import os
 import logging
 
-from telegram import Update
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
+
 from telegram.ext import (
     Application,
     CommandHandler,
+    CallbackQueryHandler,
     ContextTypes,
 )
 
@@ -20,6 +26,18 @@ PORT = int(os.environ.get("PORT", 10000))
 
 # URL pública de Render
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+# =========================================================
+# PARTIDA ACTIVA
+# =========================================================
+
+partida = {
+    "activa": False,
+    "chat_id": None,
+    "premio": 0,
+    "max_jugadores": 0,
+    "jugadores": []
+}
 
 
 # =========================================================
@@ -135,6 +153,13 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # El premio debe ser mayor que 0
+    if robux <= 0:
+        await update.message.reply_text(
+            "el premio debe ser mayor que 0."
+        )
+        return
+
     # Mínimo 3 jugadores
     if max_jugadores < 3:
         await update.message.reply_text(
@@ -142,16 +167,46 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # Máximo 10 jugadores
+    if max_jugadores > 11:
+        await update.message.reply_text(
+            "el juego permite máximo 11 jugadores."
+        )
+        return
+
+    # No permitir otra partida activa
+    if partida["activa"]:
+        await update.message.reply_text(
+            "ups, ya hay una partida activa."
+        )
+        return
+
+    # Crear partida
+    partida["activa"] = True
+    partida["chat_id"] = update.effective_chat.id
+    partida["premio"] = robux
+    partida["max_jugadores"] = max_jugadores
+    partida["jugadores"] = []
+
+    # Botón para unirse
+    boton_unirse = InlineKeyboardButton(
+        "unirme ‹𝟹",
+        callback_data="juego:unirse"
+    )
+
+    teclado = InlineKeyboardMarkup([
+        [boton_unirse]
+    ])
+
+    # Mensaje de la partida
     await update.message.reply_text(
         f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
         f"⠀⠀premio: {robux} robux\n"
-        f"⠀⠀jugadores: {max_jugadores}\n\n"
-        f"⠀⠀usa /unirmejuego + emoji\n"
-        f"⠀⠀para participar.\n\n"
-        f"⠀⠀esperando jugadores..."
+        f"⠀⠀jugadores: 0/{max_jugadores}\n\n"
+        f"⠀⠀¡pulsa el botón para participar!\n\n"
+        f"⠀⠀esperando jugadores...",
+        reply_markup=teclado
     )
-
-
 # =========================================================
 # /UNIRMEJUEGO
 # =========================================================

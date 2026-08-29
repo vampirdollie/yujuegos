@@ -36,6 +36,81 @@ def _get_conn():
         DATABASE_URL,
         connect_timeout=10
     )
+
+# =========================================================
+# GUARDAR PARTIDA EN SUPABASE
+# =========================================================
+
+def guardar_partida():
+    conn = _get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO partidas (
+            chat_id,
+            premio,
+            max_jugadores,
+            estado,
+            turno,
+            turno_id,
+            activa
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+    """, (
+        partida["chat_id"],
+        partida["premio"],
+        partida["max_jugadores"],
+        partida["estado"],
+        partida["turno"],
+        partida["turno_id"],
+        partida["activa"]
+    ))
+
+    partida_id = cur.fetchone()[0]
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return partida_id
+
+
+# =========================================================
+# GUARDAR JUGADOR EN SUPABASE
+# =========================================================
+
+def guardar_jugador(partida_id, jugador):
+
+    conn = _get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO jugadores (
+            partida_id,
+            user_id,
+            nombre,
+            username,
+            emoji,
+            posicion,
+            escudo,
+            perder_turno
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """, (
+        partida_id,
+        jugador["id"],
+        jugador["nombre"],
+        jugador["username"],
+        jugador["emoji"],
+        jugador["posicion"],
+        jugador["escudo"],
+        jugador["perder_turno"]
+    ))
+
+    conn.commit()
+    cur.close()
+    conn.close()
     
 # =========================================================
 # PARTIDA ACTIVA
@@ -52,6 +127,7 @@ partida = {
     "turno_id": 0,
     "mensaje_turno": None,
     "retroceso": None,
+    "id": None,
 }
 
 
@@ -120,6 +196,7 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/unirmejuego → unirte a una partida\n"
         "/startjuego → iniciar la partida\n"
         "/cancelarjuego → cancelar la partida"
+        "/limpiarmesa → borrar la partida guardada"
     )
 
     await update.message.reply_text(
@@ -207,6 +284,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["turno_id"] += 1
     partida["mensaje_turno"] = None
     partida["retroceso"] = None
+    partida["id"] = guardar_partida()
 
     # Mensaje de la partida
     await update.message.reply_text(
@@ -272,7 +350,7 @@ async def unirmejuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Registrar jugador
-    partida["jugadores"].append({
+    jugador = {
         "id": user_id,
         "nombre": update.effective_user.full_name,
         "username": update.effective_user.username,
@@ -280,7 +358,15 @@ async def unirmejuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "posicion": 0,
         "escudo": False,
         "perder_turno": False
-    })
+    }
+
+    partida["jugadores"].append(jugador)
+
+    # Guardar jugador en Supabase
+    guardar_jugador(
+        partida["id"],
+        jugador
+    )
 
     # Calcular cupos restantes
     cupos_restantes = (
@@ -1103,6 +1189,19 @@ async def limpiarmesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎲 ᛝ no hay ninguna partida activa que limpiar."
         )
         return
+
+        # Eliminar la partida de Supabase
+    conn = _get_conn()
+    cur = conn.cursor()
+
+    cur.execute(
+        "DELETE FROM partidas WHERE id = %s",
+        (partida["id"],)
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
     # Limpiar completamente la partida
     partida["activa"] = False

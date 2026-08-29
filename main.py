@@ -38,6 +38,25 @@ def _get_conn():
     )
 
 # =========================================================
+# RULETA
+# =========================================================
+
+ruleta = {
+    "activa": False,
+    "id": None,
+    "chat_id": None,
+    "premio": 0,
+    "duracion": 0,
+    "participantes": [],
+}
+
+# =========================================================
+# GUARDAR PARTIDA EN SUPABASE
+# =========================================================
+
+def guardar_partida():
+
+# =========================================================
 # GUARDAR PARTIDA EN SUPABASE
 # =========================================================
 
@@ -96,6 +115,112 @@ def guardar_partida():
 
     return partida_id
 
+# =========================================================
+# GUARDAR RULETA
+# =========================================================
+
+def guardar_ruleta():
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO ruletas (
+                chat_id,
+                premio,
+                duracion,
+                activa
+            )
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        """, (
+            ruleta["chat_id"],
+            ruleta["premio"],
+            ruleta["duracion"],
+            True
+        ))
+
+        ruleta_id = cur.fetchone()[0]
+
+        conn.commit()
+
+        return ruleta_id
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR guardando ruleta: {e}"
+        )
+
+        raise
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+# =========================================================
+# GUARDAR GANADOR DE RULETA
+# =========================================================
+
+def guardar_ganador_ruleta(jugador, premio):
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO ganadores_ruleta (
+                ruleta_id,
+                chat_id,
+                user_id,
+                nombre,
+                username,
+                premio
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            ruleta["id"],
+            ruleta["chat_id"],
+            jugador["id"],
+            jugador["nombre"],
+            jugador["username"],
+            premio
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR guardando ganador de ruleta: {e}"
+        )
+
+        raise
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
 
 # =========================================================
 # GUARDAR JUGADOR EN SUPABASE
@@ -132,7 +257,68 @@ def guardar_jugador(partida_id, jugador):
     conn.commit()
     cur.close()
     conn.close()
-    
+
+# =========================================================
+# GUARDAR GANADOR EN SUPABASE
+# =========================================================
+
+def guardar_ganador(jugador):
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO ganadores (
+                partida_id,
+                chat_id,
+                user_id,
+                nombre,
+                username,
+                emoji,
+                premio
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            partida["id"],
+            partida["chat_id"],
+            jugador["id"],
+            jugador["nombre"],
+            jugador["username"],
+            jugador["emoji"],
+            partida["premio"]
+        ))
+
+        conn.commit()
+
+        logger.info(
+            f"GANADOR GUARDADO: "
+            f"user_id={jugador['id']} "
+            f"premio={partida['premio']}"
+        )
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR GUARDANDO GANADOR: {e}"
+        )
+
+        raise
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
 # =========================================================
 # PARTIDA ACTIVA
 # =========================================================
@@ -217,6 +403,7 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/unirmejuego → unirte a una partida\n"
         "/startjuego → iniciar la partida\n"
         "/cancelarjuego → cancelar la partida\n"
+        "/limpiarmesa → borrar la partida guardada\n"
         "/limpiarmesa → borrar la partida guardada"
     )
 
@@ -623,24 +810,35 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"a la casilla {nueva_posicion}."
     )
 
+if nueva_posicion == 51:
+
     # =====================================================
-    # VICTORIA
+    # GUARDAR GANADOR
     # =====================================================
 
-    if nueva_posicion == 51:
+    try:
 
-        await query.message.reply_text(
-            f"ꉂ(˵˃ ᗜ ˂˵) ᛝ ¡{usuario} "
-            f"{jugador_actual['emoji']} "
-            f"ha llegado a la casilla 51!\n\n"
-            f"¡ha ganado la partida! 🎉"
+        guardar_ganador(jugador_actual)
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR GUARDANDO GANADOR: {e}"
         )
 
-        partida["activa"] = False
-        partida["estado"] = "finalizada"
-        partida["retroceso"] = None
+    await query.message.reply_text(
+        f"ꉂ(˵˃ ᗜ ˂˵) ᛝ ¡{usuario} "
+        f"{jugador_actual['emoji']} "
+        f"ha llegado a la casilla 51!\n\n"
+        f"¡ha ganado la partida! 🎉\n\n"
+        f"premio: {partida['premio']} robux"
+    )
 
-        return
+    partida["activa"] = False
+    partida["estado"] = "finalizada"
+    partida["retroceso"] = None
+
+    return
 
     # =====================================================
     # CASILLA 6 — AVANZA 3
@@ -1303,6 +1501,506 @@ async def limpiarmesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================================================
+# /GANADORES
+# =========================================================
+
+async def ganadores(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    conn = None
+    cur = None
+
+    try:
+
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT
+                nombre,
+                username,
+                emoji,
+                premio,
+                fecha
+            FROM ganadores
+            WHERE chat_id = %s
+            ORDER BY fecha DESC
+            LIMIT 15
+        """, (
+            update.effective_chat.id,
+        ))
+
+        resultados = cur.fetchall()
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR CONSULTANDO GANADORES: {e}"
+        )
+
+        await update.message.reply_text(
+            "🏆 ᛝ no pude consultar el historial "
+            "de ganadores."
+        )
+
+        return
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+    # =====================================================
+    # SIN GANADORES
+    # =====================================================
+
+    if not resultados:
+
+        await update.message.reply_text(
+            "🏆 ᛝ todavía no hay ganadores "
+            "registrados en este grupo."
+        )
+
+        return
+
+    # =====================================================
+    # CREAR MENSAJE
+    # =====================================================
+
+    texto = (
+        "🏆 ᛝ 𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹 𝗱𝗲 𝗴𝗮𝗻𝗮𝗱𝗼𝗿𝗲𝘀\n\n"
+    )
+
+    for i, resultado in enumerate(resultados, start=1):
+
+        nombre, username, emoji, premio, fecha = resultado
+
+        if username:
+            usuario = f"@{username}"
+        else:
+            usuario = nombre
+
+        texto += (
+            f"{i}. {usuario} {emoji}\n"
+            f"   premio: {premio} robux\n"
+            f"   fecha: {fecha.strftime('%d/%m/%Y')}\n\n"
+        )
+
+    await update.message.reply_text(
+        texto
+    )
+
+# =========================================================
+# /YURULETA
+# =========================================================
+
+async def yuruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # Solo grupos
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "este comando solo puede utilizarse en un grupo."
+        )
+        return
+
+    # Solo admins
+    if not await es_admin(update, update.effective_user.id):
+        await update.message.reply_text(
+            "🎲 ᛝ solo los administradores pueden iniciar "
+            "una ruleta. ૮₍｡•̀ ﻌ •́｡₎ა"
+        )
+        return
+
+    # Comprobar argumentos
+    if len(context.args) != 2:
+        await update.message.reply_text(
+            "uso:\n"
+            "/yuruleta <robux> <tiempo>\n\n"
+            "ejemplo:\n"
+            "/yuruleta 50 30"
+        )
+        return
+
+    try:
+        premio = int(context.args[0])
+        duracion = int(context.args[1])
+
+    except ValueError:
+        await update.message.reply_text(
+            "debes colocar números válidos."
+        )
+        return
+
+    # Premio válido
+    if premio <= 0:
+        await update.message.reply_text(
+            "el premio debe ser mayor que 0."
+        )
+        return
+
+    # Tiempo válido
+    if duracion <= 0:
+        await update.message.reply_text(
+            "el tiempo debe ser mayor que 0 segundos."
+        )
+        return
+
+    # No permitir otra ruleta
+    if ruleta["activa"]:
+        await update.message.reply_text(
+            "🎲 ᛝ ya hay una ruleta activa."
+        )
+        return
+
+    # Crear ruleta
+    ruleta["chat_id"] = update.effective_chat.id
+    ruleta["premio"] = premio
+    ruleta["duracion"] = duracion
+    ruleta["participantes"] = []
+
+    # Guardar en Supabase
+    try:
+
+        ruleta["id"] = guardar_ruleta()
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR EN YURULETA: {e}"
+        )
+
+        ruleta["id"] = None
+        ruleta["chat_id"] = None
+        ruleta["premio"] = 0
+        ruleta["duracion"] = 0
+        ruleta["participantes"] = []
+
+        await update.message.reply_text(
+            "🎲 ᛝ ocurrió un error al crear la ruleta.\n\n"
+            "revisa los logs del bot."
+        )
+
+        return
+
+    ruleta["activa"] = True
+
+    # Botón para unirse
+    boton = InlineKeyboardButton(
+        "unirme ‹𝟹",
+        callback_data="ruleta:unirse"
+    )
+
+    teclado = InlineKeyboardMarkup([
+        [boton]
+    ])
+
+    await update.message.reply_text(
+        f"🎰 ᛝ ¡RULETA!\n\n"
+        f"premio: {premio} robux\n"
+        f"tiempo: {duracion} segundos\n\n"
+        f"pulsa el botón para participar."
+        f" ",
+        reply_markup=teclado
+    )
+
+    # Programar finalización
+    context.job_queue.run_once(
+        finalizar_ruleta,
+        duracion,
+        data={
+            "ruleta_id": ruleta["id"]
+        }
+    )
+
+# =========================================================
+# BOTÓN: UNIRSE A RULETA
+# =========================================================
+
+async def unirse_ruleta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+
+    if not ruleta["activa"]:
+        await query.answer(
+            "esta ruleta ya terminó. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    user_id = query.from_user.id
+
+    # Comprobar si ya está
+    for participante in ruleta["participantes"]:
+
+        if participante["id"] == user_id:
+
+            await query.answer(
+                "ya estás participando. ♡",
+                show_alert=True
+            )
+
+            return
+
+    # Crear jugador
+    jugador = {
+        "id": user_id,
+        "nombre": query.from_user.full_name,
+        "username": query.from_user.username
+    }
+
+    ruleta["participantes"].append(jugador)
+
+    await query.answer(
+        "¡te has unido a la ruleta! ♡"
+    )
+
+    if jugador["username"]:
+        usuario = f"@{jugador['username']}"
+    else:
+        usuario = jugador["nombre"]
+
+    await query.message.reply_text(
+        f"🎰 ᛝ {usuario} se ha unido a la ruleta. ♡\n\n"
+        f"participantes: {len(ruleta['participantes'])}"
+    )
+
+# =========================================================
+# FINALIZAR RULETA
+# =========================================================
+
+async def finalizar_ruleta(context: ContextTypes.DEFAULT_TYPE):
+
+    datos = context.job.data
+
+    # Comprobar que sea la ruleta correcta
+    if not ruleta["activa"]:
+        return
+
+    if datos["ruleta_id"] != ruleta["id"]:
+        return
+
+    # Desactivar
+    ruleta["activa"] = False
+
+    # Sin participantes
+    if not ruleta["participantes"]:
+
+        await context.bot.send_message(
+            chat_id=ruleta["chat_id"],
+            text=(
+                "🎰 ᛝ se acabó el tiempo.\n\n"
+                "nadie se unió a la ruleta. (╥﹏╥)"
+            )
+        )
+
+        ruleta["chat_id"] = None
+        ruleta["premio"] = 0
+        ruleta["duracion"] = 0
+        ruleta["participantes"] = []
+        ruleta["id"] = None
+
+        return
+
+    # Elegir ganador
+    ganador = random.choice(
+        ruleta["participantes"]
+    )
+
+    premio = ruleta["premio"]
+
+    if ganador["username"]:
+        usuario = f"@{ganador['username']}"
+    else:
+        usuario = ganador["nombre"]
+
+    # Guardar ganador
+    try:
+
+        guardar_ganador_ruleta(
+            ganador,
+            premio
+        )
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR guardando ganador: {e}"
+        )
+
+        await context.bot.send_message(
+            chat_id=ruleta["chat_id"],
+            text=(
+                "🎰 ᛝ ocurrió un error al guardar "
+                "el resultado de la ruleta."
+            )
+        )
+
+        return
+
+    # Anunciar
+    await context.bot.send_message(
+        chat_id=ruleta["chat_id"],
+        text=(
+            f"🎰 ᛝ ¡ruleta terminada!\n\n"
+            f"ganador: {usuario}\n"
+            f"premio: {premio} robux\n\n"
+            f"¡felicidades! ૮₍˶ᵔ ᵕ ᵔ˶₎ა"
+        )
+    )
+
+    # Limpiar memoria
+    ruleta["chat_id"] = None
+    ruleta["premio"] = 0
+    ruleta["duracion"] = 0
+    ruleta["participantes"] = []
+    ruleta["id"] = None
+
+# =========================================================
+# /YUHISTORIAL
+# =========================================================
+
+async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    conn = None
+    cur = None
+
+    try:
+
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT
+                user_id,
+                nombre,
+                username,
+                SUM(premio) AS total
+            FROM ganadores_ruleta
+            GROUP BY user_id, nombre, username
+            ORDER BY total DESC
+        """)
+
+        resultados = cur.fetchall()
+
+    except Exception as e:
+
+        logger.error(
+            f"ERROR consultando historial: {e}"
+        )
+
+        await update.message.reply_text(
+            "🎰 ᛝ ocurrió un error al consultar "
+            "el historial."
+        )
+
+        return
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+    if not resultados:
+
+        await update.message.reply_text(
+            "🎰 ᛝ todavía no hay ganadores registrados."
+        )
+
+        return
+
+    texto = (
+        "🎰 ᛝ 𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹 𝗱𝗲 𝗥𝘂𝗹𝗲𝘁𝗮𝘀\n\n"
+    )
+
+    for posicion, resultado in enumerate(resultados, start=1):
+
+        user_id, nombre, username, total = resultado
+
+        if username:
+            usuario = f"@{username}"
+        else:
+            usuario = nombre
+
+        texto += (
+            f"{posicion}. {usuario} → "
+            f"{total} robux\n"
+        )
+
+    await update.message.reply_text(
+        texto
+    )
+
+# =========================================================
+# /LIMPIARHISTORIAL
+# =========================================================
+
+async def limpiarhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # Solo grupos
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "este comando solo puede utilizarse en un grupo."
+        )
+        return
+
+    # Solo admins
+    if not await es_admin(update, update.effective_user.id):
+        await update.message.reply_text(
+            "🎲 ᛝ solo los administradores pueden "
+            "limpiar el historial. ૮꒰ “. . ꒱ა"
+        )
+        return
+
+    conn = None
+    cur = None
+
+    try:
+
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute(
+            "DELETE FROM ganadores_ruleta"
+        )
+
+        conn.commit()
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR limpiando historial: {e}"
+        )
+
+        await update.message.reply_text(
+            "🎰 ᛝ ocurrió un error al limpiar "
+            "el historial."
+        )
+
+        return
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+    await update.message.reply_text(
+        "🧹 ᛝ ¡historial limpiado!\n\n"
+        "todos los registros de ganadores "
+        "han sido eliminados."
+    )
+
+# =========================================================
 # MAIN
 # =========================================================
 
@@ -1337,6 +2035,22 @@ app.add_handler(
 )
 
 app.add_handler(
+    CommandHandler("ganadores", ganadores)
+)
+
+app.add_handler(
+    CommandHandler("yuruleta", yuruleta)
+)
+
+app.add_handler(
+    CommandHandler("yuhistorial", yuhistorial)
+)
+
+app.add_handler(
+    CommandHandler("limpiarhistorial", limpiarhistorial)
+)
+
+app.add_handler(
     CallbackQueryHandler(
         lanzar_dado,
         pattern=r"^juego:lanzar$"
@@ -1354,6 +2068,13 @@ app.add_handler(
     CallbackQueryHandler(
         lanzar_retroceso,
         pattern=r"^juego:retroceso_dado$"
+    )
+)
+
+app.add_handler(
+    CallbackQueryHandler(
+        unirse_ruleta,
+        pattern=r"^ruleta:unirse$"
     )
 )
 

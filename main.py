@@ -42,36 +42,57 @@ def _get_conn():
 # =========================================================
 
 def guardar_partida():
-    conn = _get_conn()
-    cur = conn.cursor()
+    conn = None
+    cur = None
 
-    cur.execute("""
-        INSERT INTO partidas (
-            chat_id,
-            premio,
-            max_jugadores,
-            estado,
-            turno,
-            turno_id,
-            activa
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO partidas (
+                chat_id,
+                premio,
+                max_jugadores,
+                estado,
+                turno,
+                turno_id,
+                activa
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            partida["chat_id"],
+            partida["premio"],
+            partida["max_jugadores"],
+            partida["estado"],
+            partida["turno"],
+            partida["turno_id"],
+            partida["activa"]
+        ))
+
+        partida_id = cur.fetchone()[0]
+
+        conn.commit()
+
+        return partida_id
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR guardando partida en Supabase: {e}"
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-    """, (
-        partida["chat_id"],
-        partida["premio"],
-        partida["max_jugadores"],
-        partida["estado"],
-        partida["turno"],
-        partida["turno_id"],
-        partida["activa"]
-    ))
 
-    partida_id = cur.fetchone()[0]
+        raise
 
-    conn.commit()
-    cur.close()
-    conn.close()
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
 
     return partida_id
 
@@ -259,7 +280,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Máximo 101 jugadores
+    # Máximo 11 jugadores
     if max_jugadores > 11:
         await update.message.reply_text(
             "el juego permite máximo 11 jugadores."
@@ -284,17 +305,19 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["turno_id"] += 1
     partida["mensaje_turno"] = None
     partida["retroceso"] = None
+
+    # Guardar partida en Supabase
     partida["id"] = guardar_partida()
 
     # Mensaje de la partida
     await update.message.reply_text(
-    f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
-    f"⠀⠀premio: {robux} robux\n"
-    f"⠀⠀jugadores: {max_jugadores}\n\n"
-    f"⠀⠀usa /unirmejuego + emoji\n"
-    f"⠀⠀para participar.\n\n"
-    f"⠀⠀esperando jugadores..."
-)
+        f"⠀⠀๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
+        f"⠀⠀premio: {robux} robux\n"
+        f"⠀⠀jugadores: {max_jugadores}\n\n"
+        f"⠀⠀usa /unirmejuego + emoji\n"
+        f"⠀⠀para participar.\n\n"
+        f"⠀⠀esperando jugadores..."
+    )
 
 # =========================================================
 # /UNIRMEJUEGO

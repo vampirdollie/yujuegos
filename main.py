@@ -1077,6 +1077,53 @@ async def cancelarjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================================================
+# /LIMPIARMESA
+# =========================================================
+
+async def limpiarmesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # Solo grupos
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "este comando solo puede utilizarse en un grupo."
+        )
+        return
+
+    # Solo admins
+    if not await es_admin(update, update.effective_user.id):
+        await update.message.reply_text(
+            "🎲 ᛝ solo los administradores pueden limpiar "
+            "la mesa. ૮꒰ “. . ꒱ა"
+        )
+        return
+
+    # Comprobar si existe una partida
+    if not partida["activa"]:
+        await update.message.reply_text(
+            "🎲 ᛝ no hay ninguna partida activa que limpiar."
+        )
+        return
+
+    # Limpiar completamente la partida
+    partida["activa"] = False
+    partida["chat_id"] = None
+    partida["premio"] = 0
+    partida["max_jugadores"] = 0
+    partida["jugadores"] = []
+    partida["estado"] = "esperando"
+    partida["turno"] = 0
+    partida["turno_id"] += 1
+    partida["mensaje_turno"] = None
+    partida["retroceso"] = None
+
+    await update.message.reply_text(
+        "🧹 ᛝ ¡mesa limpiada!\n\n"
+        "se eliminó la partida actual "
+        "y todos sus jugadores.\n\n"
+        "ya puedes crear una nueva partida. 𖹭"
+    )
+
+# =========================================================
 # MAIN
 # =========================================================
 
@@ -1104,6 +1151,10 @@ app.add_handler(
 
 app.add_handler(
     CommandHandler("cancelarjuego", cancelarjuego)
+)
+
+app.add_handler(
+    CommandHandler("limpiarmesa", limpiarmesa)
 )
 
 app.add_handler(

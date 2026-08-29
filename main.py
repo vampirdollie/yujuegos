@@ -563,90 +563,106 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================================================
 
 async def unirmejuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Comprobar que existe una partida
+if not partida["activa"]:
+    await update.message.reply_text(
+        "🎲 ᛝ no hay ninguna partida activa en este momento."
+    )
+    return
 
-    # Comprobar que existe una partida
-    if not partida["activa"]:
+# Comprobar que haya un emoji
+if len(context.args) != 1:
+    await update.message.reply_text(
+        "debes elegir un emoji para participar.\n\n"
+        "ejemplo:\n"
+        "/unirmejuego 🐶"
+    )
+    return
+
+emoji = context.args[0]
+
+# Comprobar si el emoji ya está ocupado
+for jugador in partida["jugadores"]:
+
+    if jugador["emoji"] == emoji:
         await update.message.reply_text(
-            "🎲 ᛝ no hay ninguna partida activa en este momento."
+            "ese emoji ya está ocupado. ૮꒰ “. . ꒱ა\n"
+            "elige otro para participar."
         )
         return
 
-    # Comprobar que haya un emoji
-    if len(context.args) != 1:
+# Comprobar si el usuario ya está dentro
+user_id = update.effective_user.id
+
+for jugador in partida["jugadores"]:
+
+    if jugador["id"] == user_id:
         await update.message.reply_text(
-            "debes elegir un emoji para participar.\n\n"
-            "ejemplo:\n"
-            "/unirmejuego 🐶"
+            f"🎲 ᛝ ya estás dentro de la partida.\n"
+            f"tu emoji es {jugador['emoji']}."
         )
         return
 
-    emoji = context.args[0]
+# Comprobar si quedan cupos
+if len(partida["jugadores"]) >= partida["max_jugadores"]:
+    await update.message.reply_text(
+        "🎲 ᛝ la partida ya está llena."
+    )
+    return
 
-    # Comprobar si el emoji ya está ocupado
-    for jugador in partida["jugadores"]:
+# Crear jugador
+jugador = {
+    "id": user_id,
+    "nombre": update.effective_user.full_name,
+    "username": update.effective_user.username,
+    "emoji": emoji,
+    "posicion": 0,
+    "escudo": False,
+    "perder_turno": False
+}
 
-        if jugador["emoji"] == emoji:
-            await update.message.reply_text(
-                "ese emoji ya está ocupado. ૮꒰ “. . ꒱ა\n"
-                "elige otro para participar."
-            )
-            return
+# Guardar primero en Supabase
+try:
 
-    # Comprobar si el usuario ya está dentro
-    user_id = update.effective_user.id
-
-    for jugador in partida["jugadores"]:
-
-        if jugador["id"] == user_id:
-            await update.message.reply_text(
-                f"🎲 ᛝ ya estás dentro de la partida.\n"
-                f"tu emoji es {jugador['emoji']}."
-            )
-            return
-
-    # Comprobar si quedan cupos
-    if len(partida["jugadores"]) >= partida["max_jugadores"]:
-        await update.message.reply_text(
-            "🎲 ᛝ la partida ya está llena."
-        )
-        return
-
-    # Registrar jugador
-    jugador = {
-        "id": user_id,
-        "nombre": update.effective_user.full_name,
-        "username": update.effective_user.username,
-        "emoji": emoji,
-        "posicion": 0,
-        "escudo": False,
-        "perder_turno": False
-    }
-
-    partida["jugadores"].append(jugador)
-
-    # Guardar jugador en Supabase
     guardar_jugador(
         partida["id"],
         jugador
     )
 
-    # Calcular cupos restantes
-    cupos_restantes = (
-        partida["max_jugadores"] - len(partida["jugadores"])
+except Exception as e:
+
+    logger.error(
+        f"ERROR GUARDANDO JUGADOR: {e}"
     )
-
-    # Confirmación de unión
-    username = update.effective_user.username
-
-    if username:
-        usuario = f"@{username}"
-    else:
-        usuario = update.effective_user.full_name
 
     await update.message.reply_text(
-        f"{usuario} se ha unido con {emoji}.\n"
-        f"¡quedan {cupos_restantes} cupos!"
+        "🎲 ᛝ ocurrió un error al registrarte "
+        "en la partida.\n\n"
+        "inténtalo nuevamente."
     )
+
+    return
+
+# Solo agregar a memoria si se guardó correctamente
+partida["jugadores"].append(jugador)
+
+# Calcular cupos restantes
+cupos_restantes = (
+    partida["max_jugadores"] - len(partida["jugadores"])
+)
+
+# Confirmación de unión
+username = update.effective_user.username
+
+if username:
+    usuario = f"@{username}"
+else:
+    usuario = update.effective_user.full_name
+
+await update.message.reply_text(
+    f"{usuario} se ha unido con {emoji}.\n"
+    f"¡quedan {cupos_restantes} cupos!"
+)
 
 # =========================================================
 # /STARTJUEGO

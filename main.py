@@ -453,32 +453,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================================================
+
 # /CMDS
+
 # =========================================================
 
 async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    texto = (
-        "⠀⠀\n"
+texto = (
+    "⠀⠀\n"
 
-        "/yustart → bienvenida\n"
-        "/yucmds → lista de comandos\n\n"
+    "/yustart → bienvenida\n"
+    "/yucmds → lista de comandos\n\n"
 
-        "๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
-        "/juegomesa → crear una partida\n"
-        "/unirmejuego → unirte a una partida\n"
-        "/startjuego → iniciar la partida\n"
-        "/cancelarjuego → cancelar la partida\n"
-        "/limpiarmesa → borrar la partida guardada\n\n"
-        "๑ 𝗥𝘂𝗹𝗲𝘁𝗮\n\n"
-        "/yuruleta → iniciar una ruleta\n"
-        "/yuhistorial → ver ganancias acumuladas\n"
-        "/limpiarhistorial → borrar el historial\n"
-    )
+    "๑ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗠𝗲𝘀𝗮\n\n"
+    "/juegomesa → crear una partida\n"
+    "/unirmejuego → unirte a una partida\n"
+    "/startjuego → iniciar la partida\n"
+    "/cancelarjuego → cancelar la partida\n"
+    "/limpiarmesa → borrar la partida guardada\n\n"
 
-    await update.message.reply_text(
-        texto
-    )
+    "๑ 𝗥𝘂𝗹𝗲𝘁𝗮\n\n"
+    "/yuruleta → iniciar una ruleta\n\n"
+
+    "๑ 𝗥𝗲𝗳𝗹𝗲𝗷𝗼𝘀\n\n"
+    "/reflejos → iniciar un juego de reflejos\n"
+    "/stopreflejos → cancelar el juego de reflejos\n\n"
+
+    "๑ 𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹\n\n"
+    "/yuhistorial → ver ganancias acumuladas\n"
+    "/ganadores → ver ganadores del juego de mesa\n"
+    "/limpiarhistorial → borrar el historial\n"
+)
+
+await update.message.reply_text(
+    texto
+)
 
 # =========================================================
 # /JUEGOMESA

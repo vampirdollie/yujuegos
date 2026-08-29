@@ -39,7 +39,10 @@ partida = {
     "max_jugadores": 0,
     "jugadores": [],
     "estado": "esperando",
-    "turno": 0
+    "turno": 0,
+    "turno_id": 0,
+    "mensaje_turno": None,
+    "retroceso": None,
 }
 
 
@@ -98,7 +101,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     texto = (
-        "𖹭 𝗖𝗼𝗺𝗮𝗻𝗱𝗼𝘀\n\n"
+        "⠀⠀\n"
 
         "/yustart → bienvenida\n"
         "/yucmds → lista de comandos\n\n"
@@ -259,7 +262,7 @@ async def unirmejuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "id": user_id,
         "nombre": update.effective_user.full_name,
         "username": update.effective_user.username,
-        "emoji": emoji
+        "emoji": emoji,
         "posicion": 0,
         "escudo": False,
         "perder_turno": False
@@ -328,6 +331,7 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Cambiar estado de la partida
     partida["estado"] = "jugando"
     partida["turno"] = 0
+    partida["turno_id"] += 1
 
     # Crear lista de jugadores
     jugadores_texto = ""
@@ -343,31 +347,16 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{usuario} {jugador['emoji']}\n"
         )
 
-    # Primer jugador
-    primer_jugador = partida["jugadores"][0]
-
-    if primer_jugador["username"]:
-        usuario_turno = f"@{primer_jugador['username']}"
-    else:
-        usuario_turno = primer_jugador["nombre"]
-
-    # Botón para lanzar el dado
-    boton_dado = InlineKeyboardButton(
-        "lanzar ‹𝟹",
-        callback_data="juego:lanzar"
-    )
-
-    teclado = InlineKeyboardMarkup([
-        [boton_dado]
-    ])
-
     # Mensaje de inicio
     await update.message.reply_text(
         f"🎲 ᛝ ¡la partida ha comenzado!\n\n"
-        f"{jugadores_texto}\n"
-        f"{usuario_turno} {primer_jugador['emoji']} "
-        f"lanza el dado, ¡suerte!",
-        reply_markup=teclado
+        f"{jugadores_texto}"
+    )
+
+    # Enviar primer turno
+    await enviar_turno(
+        context,
+        partida["turno_id"]
     )
 
 # =========================================================
@@ -408,38 +397,289 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Responder al botón
     await query.answer()
 
-    # Lanzar dado
-    import random
+    # Este turno ya fue utilizado
+    partida["turno_id"] += 1
 
+    # Lanzar dado
     resultado = random.randint(1, 6)
 
     # Identificar jugador
-    if jugador_actual["username"]:
-        usuario = f"@{jugador_actual['username']}"
-    else:
-        usuario = jugador_actual["nombre"]
+    usuario = nombre_usuario(jugador_actual)
 
-    # Avisar resultado
-    await query.message.reply_text(
-        f"🎲 . . . {usuario} {jugador_actual['emoji']} "
-        f"ha sacado un {resultado}."
+    # Posición actual
+    posicion_actual = jugador_actual["posicion"]
+
+    # Calcular nueva posición
+    nueva_posicion = posicion_actual + resultado
+
+    # Comprobar si supera 51
+    if nueva_posicion > 51:
+
+        await query.message.reply_text(
+            f"🎲 . . . {usuario} {jugador_actual['emoji']} "
+            f"ha sacado un {resultado}.\n\n"
+            f"está en la casilla {posicion_actual} "
+            f"y necesita exactamente "
+            f"{51 - posicion_actual} para llegar a 51.\n\n"
+            f"no avanza."
+        )
+
+    else:
+
+        # Actualizar posición
+        jugador_actual["posicion"] = nueva_posicion
+
+        await query.message.reply_text(
+            f"🎲 . . . {usuario} {jugador_actual['emoji']} "
+            f"ha sacado un {resultado}.\n\n"
+            f"avanza de la casilla {posicion_actual} "
+            f"a la casilla {nueva_posicion}."
+        )
+
+        # Comprobar victoria
+        if nueva_posicion == 51:
+
+            await query.message.reply_text(
+                f"ꉂ(˵˃ ᗜ ˂˵) ᛝ ¡{usuario} "
+                f"{jugador_actual['emoji']} "
+                f"ha llegado a la casilla 51!\n\n"
+                f"¡ha ganado la partida! 🎉"
+            )
+
+            partida["activa"] = False
+            partida["estado"] = "finalizada"
+
+            return
+
+        # =================================================
+        # CASILLA 6 — AVANZA 3
+        # =================================================
+
+        if nueva_posicion == 6:
+
+            posicion_anterior = jugador_actual["posicion"]
+            posicion_especial = posicion_anterior + 3
+
+            if posicion_especial <= 51:
+
+                jugador_actual["posicion"] = posicion_especial
+
+                await query.message.reply_text(
+                    f"🟣 ᛝ ¡AVANZA 3 CASILLAS! ⸜(｡˃ ᵕ ˂ )⸝\n\n"
+                    f"{usuario} {jugador_actual['emoji']} "
+                    f"avanza de la casilla "
+                    f"{posicion_anterior} a la casilla "
+                    f"{posicion_especial}."
+                )
+
+            else:
+
+                await query.message.reply_text(
+                    f"🟣 ᛝ ¡AVANZA 3 CASILLAS! ⸜(｡˃ ᵕ ˂ )⸝\n\n"
+                    f"no puede avanzar porque "
+                    f"superaría la casilla 51."
+                )
+
+        # =================================================
+        # CASILLA 14 — DADO EXTRA
+        # =================================================
+
+        if jugador_actual["posicion"] == 14:
+
+            await query.message.reply_text(
+                f"🟣 ᛝ ¡DADO EXTRA! ⸜(｡˃ ᵕ ˂ )⸝\n\n"
+                f"{usuario} {jugador_actual['emoji']} "
+                f"tiene la oportunidad de lanzar otra vez."
+            )
+
+            # Mantener el mismo jugador
+            partida["turno_id"] += 1
+
+            await enviar_turno(
+                context,
+                partida["turno_id"]
+            )
+
+            return
+
+        # =================================================
+        # CASILLA 26 — ESCUDO
+        # =================================================
+
+        if jugador_actual["posicion"] == 26:
+
+            jugador_actual["escudo"] = True
+
+            await query.message.reply_text(
+                f"🟣 ᛝ ¡ESCUDO! ⸜(｡˃ ᵕ ˂ )⸝\n\n"
+                f"{usuario} {jugador_actual['emoji']} "
+                f"ha conseguido un escudo. 🛡️"
+            )
+
+        # =================================================
+        # CASILLA 20 — ELEGIR JUGADOR
+        # =================================================
+
+        if jugador_actual["posicion"] == 20:
+
+            botones = []
+
+            for jugador in partida["jugadores"]:
+
+                if jugador["id"] == jugador_actual["id"]:
+                    continue
+
+                botones.append([
+                    InlineKeyboardButton(
+                        f"{nombre_usuario(jugador)} "
+                        f"{jugador['emoji']}",
+                        callback_data=(
+                            f"juego:retroceder:{jugador['id']}"
+                        )
+                    )
+                ])
+
+            teclado = InlineKeyboardMarkup(botones)
+
+            await query.message.reply_text(
+                f"🟠 ᛝ ¡ELIGES QUE ALGUIEN RETROCEDA! (っ˕ -｡)\n\n"
+                f"{usuario} {jugador_actual['emoji']}, "
+                f"elige a quién hacer retroceder.",
+                reply_markup=teclado
+            )
+
+            return
+
+        # =================================================
+        # CASILLA 32 — LANZA DE NUEVO Y RETROCEDE
+        # =================================================
+
+        if jugador_actual["posicion"] == 32:
+
+            await query.message.reply_text(
+                f"🟠 ᛝ ¡LANZA DE NUEVO! (っ˕ -｡)\n\n"
+                f"{usuario} {jugador_actual['emoji']} "
+                f"debe lanzar otra vez y retroceder "
+                f"esa cantidad. :("
+            )
+
+            boton_dado = InlineKeyboardButton(
+                "lanzar ‹𝟹",
+                callback_data="juego:retroceso_dado"
+            )
+
+            teclado = InlineKeyboardMarkup([
+                [boton_dado]
+            ])
+
+            partida["retroceso"] = {
+                "jugador_id": jugador_actual["id"],
+                "atacante_id": jugador_actual["id"],
+                "turno_id": partida["turno_id"]
+            }
+
+            await query.message.reply_text(
+                f"{usuario} {jugador_actual['emoji']}, "
+                f"lanza el dado.",
+                reply_markup=teclado
+            )
+
+            context.job_queue.run_once(
+                tiempo_retroceso_agotado,
+                60,
+                data={
+                    "turno_id": partida["turno_id"],
+                    "jugador_id": jugador_actual["id"]
+                }
+            )
+
+            return
+
+        # =================================================
+        # CASILLA 46 — PIERDE EL SIGUIENTE TURNO
+        # =================================================
+
+        if jugador_actual["posicion"] == 46:
+
+            jugador_actual["perder_turno"] = True
+
+            await query.message.reply_text(
+                f"🟠 ᛝ ¡OH, NO! (っ˕ -｡)\n\n"
+                f"{usuario} {jugador_actual['emoji']} "
+                f"pierde su siguiente turno. :("
+            )
+
+    # Pasar al siguiente jugador
+    await pasar_turno(context)
+
+# =========================================================
+# TIEMPO AGOTADO
+# =========================================================
+
+async def tiempo_agotado(context: ContextTypes.DEFAULT_TYPE):
+
+    # Comprobar que siga existiendo una partida
+    if not partida["activa"]:
+        return
+
+    if partida["estado"] != "jugando":
+        return
+
+    # Datos guardados en el trabajo
+    datos = context.job.data
+
+    turno_id = datos["turno_id"]
+
+    # Si ya cambió el turno, este temporizador es viejo
+    if turno_id != partida["turno_id"]:
+        return
+
+    jugador = partida["jugadores"][partida["turno"]]
+
+    if jugador["username"]:
+        usuario = f"@{jugador['username']}"
+    else:
+        usuario = jugador["nombre"]
+
+    await context.bot.send_message(
+        chat_id=partida["chat_id"],
+        text=(
+            f"⏱️ ᛝ se acabó el tiempo de {usuario} "
+            f"{jugador['emoji']}.\n\n"
+            f"pasa el turno."
+        )
     )
 
     # Pasar al siguiente jugador
     partida["turno"] += 1
 
-    # Si llegamos al final, volver al primero
     if partida["turno"] >= len(partida["jugadores"]):
         partida["turno"] = 0
 
-    siguiente_jugador = partida["jugadores"][partida["turno"]]
+    # Crear nuevo turno
+    partida["turno_id"] += 1
 
-    if siguiente_jugador["username"]:
-        siguiente_usuario = f"@{siguiente_jugador['username']}"
+    await enviar_turno(
+        context,
+        partida["turno_id"]
+    )
+
+# =========================================================
+# ENVIAR TURNO
+# =========================================================
+
+async def enviar_turno(
+    context: ContextTypes.DEFAULT_TYPE,
+    turno_id: int
+):
+
+    jugador = partida["jugadores"][partida["turno"]]
+
+    if jugador["username"]:
+        usuario = f"@{jugador['username']}"
     else:
-        siguiente_usuario = siguiente_jugador["nombre"]
+        usuario = jugador["nombre"]
 
-    # Botón para el siguiente turno
     boton_dado = InlineKeyboardButton(
         "lanzar ‹𝟹",
         callback_data="juego:lanzar"
@@ -449,12 +689,425 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [boton_dado]
     ])
 
-    # Avisar siguiente turno
-    await query.message.reply_text(
-        f"{siguiente_usuario} {siguiente_jugador['emoji']} "
-        f"lanza el dado, ¡suerte!",
+    await context.bot.send_message(
+        chat_id=partida["chat_id"],
+        text=(
+            f"𖹭 {usuario} {jugador['emoji']} "
+            f"lanza el dado, ¡suerte!"
+        ),
         reply_markup=teclado
     )
+
+    # Crear temporizador de 1 minuto
+    context.job_queue.run_once(
+        tiempo_agotado,
+        60,
+        data={
+            "turno_id": turno_id
+        }
+    )
+
+# =========================================================
+# MOSTRAR USUARIO
+# =========================================================
+
+def nombre_usuario(jugador):
+
+    if jugador["username"]:
+        return f"@{jugador['username']}"
+
+    return jugador["nombre"]
+
+
+# =========================================================
+# PASAR AL SIGUIENTE JUGADOR
+# =========================================================
+
+async def pasar_turno(context: ContextTypes.DEFAULT_TYPE):
+
+    partida["turno"] += 1
+
+    if partida["turno"] >= len(partida["jugadores"]):
+        partida["turno"] = 0
+
+    partida["turno_id"] += 1
+
+    await enviar_turno(
+        context,
+        partida["turno_id"]
+    )
+
+
+# =========================================================
+# TIEMPO AGOTADO
+# =========================================================
+
+async def tiempo_agotado(context: ContextTypes.DEFAULT_TYPE):
+
+    if not partida["activa"]:
+        return
+
+    if partida["estado"] != "jugando":
+        return
+
+    datos = context.job.data
+
+    turno_id = datos["turno_id"]
+
+    # Este temporizador pertenece a un turno anterior
+    if turno_id != partida["turno_id"]:
+        return
+
+    jugador = partida["jugadores"][partida["turno"]]
+
+    usuario = nombre_usuario(jugador)
+
+    # Si tenía que perder turno, simplemente pasa
+    if jugador["perder_turno"]:
+
+        jugador["perder_turno"] = False
+
+        await context.bot.send_message(
+            chat_id=partida["chat_id"],
+            text=(
+                f"⏱️ ᛝ se acabó el tiempo de {usuario} "
+                f"{jugador['emoji']}.\n\n"
+                f"pasa el turno."
+            )
+        )
+
+        await pasar_turno(context)
+        return
+
+    await context.bot.send_message(
+        chat_id=partida["chat_id"],
+        text=(
+            f"⏱️ ᛝ se acabó el tiempo de {usuario} "
+            f"{jugador['emoji']}.\n\n"
+            f"pasa el turno."
+        )
+    )
+
+    await pasar_turno(context)
+
+
+# =========================================================
+# ENVIAR TURNO
+# =========================================================
+
+async def enviar_turno(
+    context: ContextTypes.DEFAULT_TYPE,
+    turno_id: int
+):
+
+    jugador = partida["jugadores"][partida["turno"]]
+
+    usuario = nombre_usuario(jugador)
+
+    # Comprobar si perdió este turno
+    if jugador["perder_turno"]:
+
+        jugador["perder_turno"] = False
+
+        await context.bot.send_message(
+            chat_id=partida["chat_id"],
+            text=(
+                f"🎲 ᛝ va {usuario} {jugador['emoji']}, "
+                f"pero no tiene turno. :("
+            )
+        )
+
+        await pasar_turno(context)
+        return
+
+    boton_dado = InlineKeyboardButton(
+        "lanzar ‹𝟹",
+        callback_data="juego:lanzar"
+    )
+
+    teclado = InlineKeyboardMarkup([
+        [boton_dado]
+    ])
+
+    await context.bot.send_message(
+        chat_id=partida["chat_id"],
+        text=(
+            f"𖹭 {usuario} {jugador['emoji']} "
+            f"lanza el dado, ¡suerte!"
+        ),
+        reply_markup=teclado
+    )
+
+    # Un minuto para lanzar
+    context.job_queue.run_once(
+        tiempo_agotado,
+        60,
+        data={
+            "turno_id": turno_id
+        }
+    )
+
+
+# =========================================================
+# CASILLA 20: ELEGIR JUGADOR
+# =========================================================
+
+async def elegir_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+
+    if not partida["activa"]:
+        await query.answer(
+            "no hay una partida activa. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    if not query.data.startswith("juego:retroceder:"):
+        return
+
+    try:
+        objetivo_id = int(
+            query.data.split(":")[2]
+        )
+    except (ValueError, IndexError):
+        await query.answer(
+            "no pude identificar al jugador. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    jugador_actual = partida["jugadores"][partida["turno"]]
+
+    # Solo quien cayó en la 20 puede elegir
+    if query.from_user.id != jugador_actual["id"]:
+        await query.answer(
+            "no puedes elegir en este momento. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    objetivo = None
+
+    for jugador in partida["jugadores"]:
+        if jugador["id"] == objetivo_id:
+            objetivo = jugador
+            break
+
+    if objetivo is None:
+        await query.answer(
+            "ese jugador ya no está disponible.",
+            show_alert=True
+        )
+        return
+
+    # No puede elegirse a sí mismo
+    if objetivo["id"] == jugador_actual["id"]:
+        await query.answer(
+            "no puedes elegirte a ti mismo. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    # Si tiene escudo
+    if objetivo["escudo"]:
+
+        objetivo["escudo"] = False
+
+        await query.message.reply_text(
+            f"🛡️ ᛝ {nombre_usuario(objetivo)} "
+            f"{objetivo['emoji']} tenía un escudo.\n\n"
+            f"¡el escudo evitó el retroceso!"
+        )
+
+        await pasar_turno(context)
+        return
+
+    # Guardamos quién debe lanzar para retroceder
+    partida["retroceso"] = {
+        "jugador_id": objetivo["id"],
+        "atacante_id": jugador_actual["id"],
+        "turno_id": partida["turno_id"]
+    }
+
+    boton_dado = InlineKeyboardButton(
+        "lanzar ‹𝟹",
+        callback_data="juego:retroceso_dado"
+    )
+
+    teclado = InlineKeyboardMarkup([
+        [boton_dado]
+    ])
+
+    await query.message.reply_text(
+        f"🟠 ᛝ {nombre_usuario(jugador_actual)} "
+        f"{jugador_actual['emoji']} ha elegido a "
+        f"{nombre_usuario(objetivo)} {objetivo['emoji']}.\n\n"
+        f"{nombre_usuario(objetivo)} {objetivo['emoji']}, "
+        f"lanza el dado para saber cuánto retrocedes.",
+        reply_markup=teclado
+    )
+
+    context.job_queue.run_once(
+        tiempo_retroceso_agotado,
+        60,
+        data={
+            "turno_id": partida["turno_id"],
+            "jugador_id": objetivo["id"]
+        }
+    )
+
+
+# =========================================================
+# RETROCESO DE LA CASILLA 20
+# =========================================================
+
+async def lanzar_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+
+    if not partida["activa"]:
+        await query.answer(
+            "no hay una partida activa. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    retroceso = partida.get("retroceso")
+
+    if not retroceso:
+        await query.answer(
+            "este lanzamiento ya no está disponible.",
+            show_alert=True
+        )
+        return
+
+    if query.from_user.id != retroceso["jugador_id"]:
+        await query.answer(
+            "este dado no es para ti. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    # Invalidar temporizador
+    partida["turno_id"] += 1
+
+    jugador = None
+
+    for participante in partida["jugadores"]:
+        if participante["id"] == query.from_user.id:
+            jugador = participante
+            break
+
+    if jugador is None:
+        return
+
+    resultado = random.randint(1, 6)
+
+    usuario = nombre_usuario(jugador)
+
+    if jugador["escudo"]:
+
+        jugador["escudo"] = False
+
+        await query.message.reply_text(
+            f"🎲 . . . {usuario} {jugador['emoji']} "
+            f"ha sacado un {resultado}.\n\n"
+            f"🛡️ ᛝ pero tenía un escudo, así que "
+            f"no retrocede."
+        )
+
+    else:
+
+        posicion_anterior = jugador["posicion"]
+
+        jugador["posicion"] = max(
+            0,
+            jugador["posicion"] - resultado
+        )
+
+        await query.message.reply_text(
+            f"🎲 . . . {usuario} {jugador['emoji']} "
+            f"ha sacado un {resultado}.\n\n"
+            f"retrocede de la casilla {posicion_anterior} "
+            f"a la casilla {jugador['posicion']}."
+        )
+
+    partida["retroceso"] = None
+
+    await pasar_turno(context)
+
+
+# =========================================================
+# TIEMPO AGOTADO — RETROCESO
+# =========================================================
+
+async def tiempo_retroceso_agotado(context: ContextTypes.DEFAULT_TYPE):
+
+    if not partida["activa"]:
+        return
+
+    retroceso = partida.get("retroceso")
+
+    if not retroceso:
+        return
+
+    if retroceso["turno_id"] != partida["turno_id"]:
+        return
+
+    jugador = None
+
+    for participante in partida["jugadores"]:
+        if participante["id"] == retroceso["jugador_id"]:
+            jugador = participante
+            break
+
+    if jugador is None:
+        return
+
+    usuario = nombre_usuario(jugador)
+
+    # Si no lanzó, retrocede automáticamente 2
+    if jugador["escudo"]:
+
+        jugador["escudo"] = False
+
+        await context.bot.send_message(
+            chat_id=partida["chat_id"],
+            text=(
+                f"⏱️ ᛝ se acabó el tiempo de {usuario} "
+                f"{jugador['emoji']}.\n\n"
+                f"🛡️ ᛝ tenía un escudo, así que no retrocede."
+            )
+        )
+
+    else:
+
+        posicion_anterior = jugador["posicion"]
+
+        jugador["posicion"] = max(
+            0,
+            jugador["posicion"] - 2
+        )
+
+        await context.bot.send_message(
+            chat_id=partida["chat_id"],
+            text=(
+                f"⏱️ ᛝ se acabó el tiempo de {usuario} "
+                f"{jugador['emoji']}.\n\n"
+                f"retrocede automáticamente 2 casillas.\n\n"
+                f"pasa de la casilla {posicion_anterior} "
+                f"a la casilla {jugador['posicion']}."
+            )
+        )
+
+    partida["retroceso"] = None
+
+    await pasar_turno(context)
 
 # =========================================================
 # /CANCELARJUEGO
@@ -477,10 +1130,27 @@ async def cancelarjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # Comprobar que exista una partida
+    if not partida["activa"]:
+        await update.message.reply_text(
+            "🎲 ᛝ no hay ninguna partida activa."
+        )
+        return
+
+    # Cancelar partida
+    partida["activa"] = False
+    partida["chat_id"] = None
+    partida["premio"] = 0
+    partida["max_jugadores"] = 0
+    partida["jugadores"] = []
+    partida["estado"] = "esperando"
+    partida["turno"] = 0
+    partida["turno_id"] += 1
+    partida["mensaje_turno"] = None
+
     await update.message.reply_text(
         "🗑️ ᛝ juego cancelado."
     )
-
 
 # =========================================================
 # MAIN
@@ -516,6 +1186,20 @@ app.add_handler(
     CallbackQueryHandler(
         lanzar_dado,
         pattern=r"^juego:lanzar$"
+    )
+)
+
+app.add_handler(
+    CallbackQueryHandler(
+        elegir_retroceso,
+        pattern=r"^juego:retroceder:"
+    )
+)
+
+app.add_handler(
+    CallbackQueryHandler(
+        lanzar_retroceso,
+        pattern=r"^juego:retroceso_dado$"
     )
 )
 

@@ -2089,7 +2089,7 @@ async def elegir_correcto_reflejos(
             text=(
                 "⚡ ᛝ 𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦\n"
                 f"⠀๑ premio: {reflejos['premio']} robux\n\n"
-                "elige el emoji correcto. . .\\n"
+                "elige el emoji correcto. . .\n"
                 "¡rápido!"
             ),
             reply_markup=teclado

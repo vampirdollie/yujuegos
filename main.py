@@ -1130,6 +1130,8 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         partida["estado"] = "finalizada"
         partida["retroceso"] = None
 
+        actualizar_partida()
+
         return
 
     # =====================================================
@@ -1260,6 +1262,14 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "atacante_id": jugador_actual["id"],
             "turno_id": partida["turno_id"]
         }
+
+        actualizar_partida()
+
+        await query.message.reply_text(
+            f"{usuario} {jugador_actual['emoji']}, "
+            f"lanza el dado.",
+            reply_markup=teclado
+        )
 
         await query.message.reply_text(
             f"{usuario} {jugador_actual['emoji']}, "
@@ -1540,6 +1550,8 @@ async def elegir_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "turno_id": partida["turno_id"]
     }
 
+    actualizar_partida()
+
     boton_dado = InlineKeyboardButton(
         "lanzar ‹𝟹",
         callback_data="juego:retroceso_dado"
@@ -1657,7 +1669,9 @@ async def lanzar_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     partida["retroceso"] = None
 
-    await pasar_turno(context)
+    actualizar_partida()
+
+    await pasar_turno(update, context)
 
 
 # =========================================================
@@ -1734,7 +1748,9 @@ async def tiempo_retroceso_agotado(context: ContextTypes.DEFAULT_TYPE):
 
     partida["retroceso"] = None
 
-    await pasar_turno(context)
+    actualizar_partida()
+
+    await pasar_turno(update, context)
 
 # =========================================================
 # /CANCELARJUEGO
@@ -1844,6 +1860,7 @@ async def limpiarmesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["turno_id"] += 1
     partida["mensaje_turno"] = None
     partida["retroceso"] = None
+    partida["id"] = None
 
     await update.message.reply_text(
         "🧹 ᛝ ¡mesa limpiada!\n\n"

@@ -547,10 +547,10 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Máximo 11 jugadores
-    if max_jugadores > 11:
+    # Máximo 15 jugadores
+    if max_jugadores > 15:
         await update.message.reply_text(
-            "el juego permite máximo 11 jugadores."
+            "el juego permite máximo 15 jugadores."
         )
         return
 
@@ -901,11 +901,13 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     jugador_actual["posicion"] = nueva_posicion
 
-    await query.message.reply_text(
-        f"🎲 . . . {usuario} {jugador_actual['emoji']} "
-        f"ha sacado un {resultado}.\n\n"
-        f"avanza de la casilla {posicion_actual} "
-        f"a la casilla {nueva_posicion}."
+    await query.edit_message_text(
+        text=(
+            f"🎲 . . . {usuario} {jugador_actual['emoji']} "
+            f"ha sacado un {resultado}.\n\n"
+            f"avanza de la casilla {posicion_actual} "
+            f"a la casilla {nueva_posicion}."
+        )
     )
 
     # =====================================================
@@ -1216,7 +1218,7 @@ async def enviar_turno(
     # MENSAJE DEL TURNO
     # =====================================================
 
-    await context.bot.send_message(
+    mensaje = await context.bot.send_message(
         chat_id=partida["chat_id"],
         text=(
             f"𖹭 {usuario} {jugador['emoji']} "
@@ -1224,6 +1226,7 @@ async def enviar_turno(
         ),
         reply_markup=teclado
     )
+    partida["mensaje_turno"] = mensaje.message_id
 
     # =====================================================
     # TEMPORIZADOR DE 1 MINUTO
@@ -1564,19 +1567,32 @@ async def limpiarmesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Comprobar si existe una partida
-    if not partida["activa"]:
+    if partida["id"] is None:
         await update.message.reply_text(
             "🎲 ᛝ no hay ninguna partida activa que limpiar."
         )
         return
 
-    # Eliminar la partida de Supabase
+    # =====================================================
+    # LIMPIAR TODO EL JUEGO DE MESA
+    # =====================================================
+
     conn = _get_conn()
     cur = conn.cursor()
 
+    # Borrar todos los ganadores
     cur.execute(
-        "DELETE FROM partidas WHERE id = %s",
-        (partida["id"],)
+        "DELETE FROM ganadores"
+    )
+
+    # Borrar todos los jugadores
+    cur.execute(
+        "DELETE FROM jugadores"
+    )
+
+    # Borrar todas las partidas
+    cur.execute(
+        "DELETE FROM partidas"
     )
 
     conn.commit()
@@ -1601,6 +1617,39 @@ async def limpiarmesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "y todos sus jugadores.\n\n"
         "ya puedes crear una nueva partida. 𖹭"
     )
+
+# =========================================================
+# /POSICIONES
+# =========================================================
+
+async def posiciones(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not partida["activa"] and not partida["jugadores"]:
+        await update.message.reply_text(
+            "🎲 ᛝ no hay una partida activa."
+        )
+        return
+
+    texto = (
+        "🎲 ᛝ 𝗣𝗼𝘀𝗶𝗰𝗶𝗼𝗻𝗲𝘀\n\n"
+    )
+
+    jugadores_ordenados = sorted(
+        partida["jugadores"],
+        key=lambda jugador: jugador["posicion"],
+        reverse=True
+    )
+
+    for i, jugador in enumerate(jugadores_ordenados, start=1):
+
+        usuario = nombre_usuario(jugador)
+
+        texto += (
+            f"{i}. {jugador['emoji']} {usuario}\n"
+            f"   casilla: {jugador['posicion']}/51\n\n"
+        )
+
+    await update.message.reply_text(texto)
 
 # =========================================================
 # /GANADORES
@@ -1853,21 +1902,23 @@ async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Comprobar argumentos
-    if len(context.args) != 1:
+    if len(context.args) != 2:
         await update.message.reply_text(
             "uso:\n"
-            "/reflejos <robux>\n\n"
-            "ejemplo:\n"
-            "/reflejos 50"
+            "/reflejos <robux> <emojis>\n\n"
+            "ejemplos:\n"
+            "/reflejos 20 5\n"
+            "/reflejos 10 7"
         )
         return
 
     try:
         premio = int(context.args[0])
+        cantidad_emojis = int(context.args[1])
 
     except ValueError:
         await update.message.reply_text(
-            "debes colocar un número válido."
+            "debes colocar números válidos."
         )
         return
 
@@ -1875,6 +1926,12 @@ async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if premio <= 0:
         await update.message.reply_text(
             "el premio debe ser mayor que 0."
+        )
+        return
+
+    if cantidad_emojis < 3 or cantidad_emojis > 10:
+        await update.message.reply_text(
+            "puedes usar entre 3 y 10 emojis."
         )
         return
 
@@ -1905,9 +1962,8 @@ async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=(
                 "⚡ ᛝ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗿𝗲𝗳𝗹𝗲𝗷𝗼𝘀\n\n"
                 f"๑ premio: {premio} robux\n\n"
-                "envíame los 5 emojis que vamos a usar.\n"
-                "๑ ejemplo:\n"
-                "🐶 🐱 🐰 🐼 🦊"
+                f"envíame los {cantidad_emojis} emojis que vamos a usar.\n"
+                "๑ ejemplo: 🐶 🐱 🐰 🐼 🦊"
             )
         )
 
@@ -2715,6 +2771,10 @@ app.add_handler(
 
 app.add_handler(
     CommandHandler("limpiarmesa", limpiarmesa)
+)
+
+app.add_handler(
+    CommandHandler("posiciones", posiciones)
 )
 
 app.add_handler(

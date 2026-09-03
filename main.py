@@ -2292,49 +2292,31 @@ async def jugar_reflejos(
 
     # Comprobar que el juego siga activo
     if not reflejos["activa"]:
-        await query.answer(
-            "este juego ya terminó. (╥﹏╥)",
-            show_alert=True
-        )
+        await query.answer("este juego ya terminó. (╥﹏╥)", show_alert=True)
         return
 
     # Obtener el emoji seleccionado
     try:
         emoji_elegido = query.data.split(":", 2)[2]
     except (IndexError, AttributeError):
-        await query.answer(
-            "no pude identificar el emoji.",
-            show_alert=True
-        )
+        await query.answer("no pude identificar el emoji.", show_alert=True)
         return
 
     # Comprobar que el emoji pertenezca al juego
     if emoji_elegido not in reflejos["emojis"]:
-        await query.answer(
-            "ese emoji no pertenece a este juego.",
-            show_alert=True
-        )
+        await query.answer("ese emoji no pertenece a este juego.", show_alert=True)
         return
 
     # =====================================================
     # RESPUESTA INCORRECTA
     # =====================================================
-
     if emoji_elegido != reflejos["correcto"]:
-
-        await query.answer(
-            "❌ incorrecto, ¡sigue intentando!",
-            show_alert=True
-        )
-
+        await query.answer("❌ incorrecto, ¡sigue intentando!", show_alert=True)
         return
 
     # =====================================================
     # GANADOR
     # =====================================================
-
-    # Desactivar inmediatamente
-    # para evitar que dos personas ganen
     reflejos["activa"] = False
     reflejos["fase"] = "finalizado"
 
@@ -2352,36 +2334,19 @@ async def jugar_reflejos(
         usuario = jugador["nombre"]
 
     # Responder al botón
-    await query.answer(
-        "⚡ ¡CORRECTO! ¡GANASTE! ♡",
-        show_alert=True
-    )
+    await query.answer("⚡ ¡CORRECTO! ¡GANASTE! ♡", show_alert=True)
 
     # =====================================================
     # GUARDAR GANADOR
     # =====================================================
-
     try:
-
-        guardar_ganador_reflejos(
-            jugador,
-            premio
-        )
-
+        guardar_ganador_reflejos(jugador, premio)
     except Exception as e:
-
-        logger.error(
-            f"ERROR GUARDANDO GANADOR DE REFLEJOS: {e}"
-        )
-
+        logger.error(f"ERROR GUARDANDO GANADOR DE REFLEJOS: {e}")
         await context.bot.send_message(
             chat_id=reflejos["chat_id"],
-            text=(
-                "⚡ ᛝ ocurrió un error al guardar "
-                "el resultado del juego."
-            )
+            text="⚡ ᛝ ocurrió un error al guardar el resultado del juego."
         )
-
         # Limpiar memoria
         reflejos["activa"] = False
         reflejos["fase"] = None
@@ -2391,48 +2356,46 @@ async def jugar_reflejos(
         reflejos["correcto"] = None
         reflejos["admin_id"] = None
         reflejos["mensaje_id"] = None
-
         return
 
-# =====================================================
-# ANUNCIAR GANADOR (EDITAR MENSAJE FINAL)
-# =====================================================
+    # =====================================================
+    # ANUNCIAR GANADOR (EDITAR MENSAJE FINAL)
+    # =====================================================
+    try:
+        await context.bot.edit_message_text(
+            chat_id=reflejos["chat_id"],
+            message_id=reflejos["mensaje_id"],
+            text=(
+                f"⚡ ᛝ ¡𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦 𝗧𝗘𝗥𝗠𝗜𝗡𝗔𝗗𝗢!\n\n"
+                f"𖹭 ganador: {usuario}\n"
+                f"𖹭 premio: {premio} robux\n"
+                f"𖹭 emoji correcto: {reflejos['correcto']}\n\n"
+                f"¡qué reflejos! ᕙ(  •̀ ᗜ •́  )ᕗ"
+            )
+        )
+    except Exception as e:
+        logger.error(f"ERROR editando mensaje final de reflejos: {e}")
+        await context.bot.send_message(
+            chat_id=reflejos["chat_id"],
+            text=(
+                f"⚡ ᛝ ¡𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦 𝗧𝗘𝗥𝗠𝗜𝗡𝗔𝗗𝗢!\n\n"
+                f"𖹭 ganador: {usuario}\n"
+                f"𖹭 premio: {premio} robux\n"
+                f"𖹭 emoji correcto: {reflejos['correcto']}\n\n"
+                f"¡qué reflejos! ᕙ(  •̀ ᗜ •́  )ᕗ"
+            )
+        )
 
-try:
-    await context.bot.edit_message_text(
-        chat_id=reflejos["chat_id"],
-        message_id=reflejos["mensaje_id"],
-        text=(
-            f"⚡ ᛝ ¡𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦 𝗧𝗘𝗥𝗠𝗜𝗡𝗔𝗗𝗢!\n\n"
-            f"𖹭 ganador: {usuario}\n"
-            f"𖹭 premio: {premio} robux\n"
-            f"𖹭 emoji correcto: {reflejos['correcto']}\n\n"
-            f"¡qué reflejos! ᕙ(  •̀ ᗜ •́  )ᕗ"
-        )
-    )
-except Exception as e:
-    logger.error(f"ERROR editando mensaje final de reflejos: {e}")
-    await context.bot.send_message(
-        chat_id=reflejos["chat_id"],
-        text=(
-            f"⚡ ᛝ ¡𝗥𝗘𝗙𝗟𝗘𝗝𝗢𝗦 𝗧𝗘𝗥𝗠𝗜𝗡𝗔𝗗𝗢!\n\n"
-            f"𖹭 ganador: {usuario}\n"
-            f"𖹭 premio: {premio} robux\n"
-            f"𖹭 emoji correcto: {reflejos['correcto']}\n\n"
-            f"¡qué reflejos! ᕙ(  •̀ ᗜ •́  )ᕗ"
-        )
-    )
-    
     # =====================================================
     # LIMPIAR MEMORIA
     # =====================================================
-
     reflejos["chat_id"] = None
     reflejos["premio"] = 0
     reflejos["emojis"] = []
     reflejos["correcto"] = None
     reflejos["admin_id"] = None
     reflejos["mensaje_id"] = None
+
 
 # =========================================================
 # /STOPREFLEJOS

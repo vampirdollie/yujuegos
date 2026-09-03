@@ -2024,7 +2024,7 @@ async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # =========================================================
-# RECIBIR EMOJIS DE REFLEJOS
+# RECIBIR EMOJIS DE REFLEJOS (CORREGIDO)
 # =========================================================
 
 async def recibir_emojis_reflejos(
@@ -2049,8 +2049,8 @@ async def recibir_emojis_reflejos(
     # Separar los emojis por espacios
     emojis = texto.split()
 
-    # Deben ser exactamente 5
-    if len(emojis) != 5:
+    # Deben ser exactamente la cantidad configurada
+    if len(emojis) != reflejos["cantidad_emojis"]:
         await update.message.reply_text(
             f"⚡ ᛝ necesito exactamente "
             f"{reflejos['cantidad_emojis']} emojis.\n\n"
@@ -2061,10 +2061,10 @@ async def recibir_emojis_reflejos(
         return
 
     # No permitir emojis repetidos
-    if len(set(emojis)) != 5:
+    if len(set(emojis)) != reflejos["cantidad_emojis"]:
         await update.message.reply_text(
             f"⚡ ᛝ los "
-             f"{reflejos['cantidad_emojis']} emojis "
+            f"{reflejos['cantidad_emojis']} emojis "
             "deben ser diferentes."
         )
         return
@@ -2075,9 +2075,7 @@ async def recibir_emojis_reflejos(
 
     # Crear botones para elegir el correcto
     botones = []
-
     for emoji in emojis:
-
         botones.append([
             InlineKeyboardButton(
                 emoji,

@@ -1074,7 +1074,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         texto += (
             f"\n\n🟣 ᛝ ¡DADO EXTRA!\n"
             f" ⸜(｡˃ ᵕ ˂ )⸝\n"
-            'emoji']} tiene la oportunidad de lanzar otra vez."
+            f"{usuario} {jugador_actual['emoji']} tiene la oportunidad de lanzar otra vez."
         )
         await query.edit_message_text(text=texto, reply_markup=teclado)
         partida["turno_id"] += 1

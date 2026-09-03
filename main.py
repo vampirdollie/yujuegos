@@ -337,6 +337,46 @@ def guardar_jugador(partida_id, jugador):
             conn.close()
 
 # =========================================================
+# ACTUALIZAR JUGADOR EN SUPABASE
+# =========================================================
+
+def actualizar_jugador(partida_id, jugador):
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE jugadores
+            SET posicion = %s,
+                escudo = %s,
+                perder_turno = %s
+            WHERE partida_id = %s AND user_id = %s
+        """, (
+            jugador.get("posicion", 0),
+            jugador.get("escudo", False),
+            jugador.get("perder_turno", False),
+            partida_id,
+            jugador["id"]
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"ERROR actualizando jugador en Supabase: {e}")
+        raise
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# =========================================================
 # GUARDAR GANADOR EN SUPABASE
 # =========================================================
 

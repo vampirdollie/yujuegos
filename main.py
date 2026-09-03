@@ -2,6 +2,7 @@ import os
 import logging
 import random
 import psycopg2
+import psycopg2.extras
 
 from telegram import (
     Update,
@@ -89,7 +90,8 @@ def guardar_partida():
                 estado,
                 turno,
                 turno_id,
-                activa
+                activa,
+                retroceso
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id
@@ -335,6 +337,52 @@ def actualizar_jugador(partida_id, jugador):
         if conn:
             conn.close()
 
+def actualizar_partida():
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE partidas
+            SET estado = %s,
+                turno = %s,
+                turno_id = %s,
+                activa = %s,
+                retroceso = %s
+            WHERE id = %s
+        """, (
+            partida["estado"],
+            partida["turno"],
+            partida["turno_id"],
+            partida["activa"],
+            psycopg2.extras.Json(partida["retroceso"])
+            if partida["retroceso"] is not None
+            else None,
+            partida["id"]
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR ACTUALIZANDO PARTIDA: {e}"
+        )
+
+        raise
+
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
 # =========================================================
 # GUARDAR GANADOR EN SUPABASE
 # =========================================================
@@ -390,6 +438,129 @@ def guardar_ganador(jugador):
 
     finally:
 
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+def restaurar_partida():
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        # Buscar la última partida activa
+        cur.execute("""
+            SELECT
+                id,
+                chat_id,
+                premio,
+                max_jugadores,
+                estado,
+                turno,
+                turno_id,
+                activa,
+                retroceso
+            FROM partidas
+            WHERE activa = TRUE
+            ORDER BY id DESC
+            LIMIT 1
+        """)
+
+        datos_partida = cur.fetchone()
+
+        if not datos_partida:
+            logger.info("No hay ninguna partida activa para restaurar.")
+            return False
+
+        (
+            partida_id,
+            chat_id,
+            premio,
+            max_jugadores,
+            estado,
+            turno,
+            turno_id,
+            activa,
+            retroceso
+        ) = datos_partida
+
+        # Buscar jugadores de esa partida
+        cur.execute("""
+            SELECT
+                user_id,
+                nombre,
+                username,
+                emoji,
+                posicion,
+                escudo,
+                perder_turno
+            FROM jugadores
+            WHERE partida_id = %s
+            ORDER BY id ASC
+        """, (
+            partida_id,
+        ))
+
+        jugadores_db = cur.fetchall()
+
+        jugadores = []
+
+        for jugador in jugadores_db:
+            (
+                user_id,
+                nombre,
+                username,
+                emoji,
+                posicion,
+                escudo,
+                perder_turno
+            ) = jugador
+
+            jugadores.append({
+                "id": user_id,
+                "nombre": nombre,
+                "username": username,
+                "emoji": emoji,
+                "posicion": posicion,
+                "escudo": escudo,
+                "perder_turno": perder_turno
+            })
+
+        # Reconstruir partida en memoria
+        partida["id"] = partida_id
+        partida["activa"] = activa
+        partida["chat_id"] = chat_id
+        partida["premio"] = premio
+        partida["max_jugadores"] = max_jugadores
+        partida["jugadores"] = jugadores
+        partida["estado"] = estado
+        partida["turno"] = turno
+        partida["turno_id"] = turno_id
+        partida["mensaje_turno"] = None
+        partida["retroceso"] = retroceso
+
+        logger.info(
+            f"PARTIDA RESTAURADA: "
+            f"id={partida_id}, "
+            f"jugadores={len(jugadores)}, "
+            f"turno={turno}, "
+            f"estado={estado}"
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"ERROR RESTAURANDO PARTIDA: {e}"
+        )
+
+        return False
+
+    finally:
         if cur:
             cur.close()
 
@@ -809,6 +980,8 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["turno"] = 0
     partida["turno_id"] += 1
 
+    actualizar_partida()
+
     # Crear lista de jugadores
     jugadores_texto = ""
 
@@ -1192,6 +1365,8 @@ async def pasar_turno(context: ContextTypes.DEFAULT_TYPE):
 
     partida["turno_id"] += 1
 
+    actualizar_partida()
+
     await enviar_turno(
         context,
         partida["turno_id"]
@@ -1542,7 +1717,7 @@ async def tiempo_retroceso_agotado(context: ContextTypes.DEFAULT_TYPE):
         )
 
         actualizar_jugador(
-            artida["id"],
+            partida["id"],
             jugador
         )
 

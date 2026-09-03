@@ -293,37 +293,47 @@ def guardar_ganador_reflejos(jugador, premio):
 # GUARDAR JUGADOR EN SUPABASE
 # =========================================================
 
-def guardar_jugador(partida_id, jugador):
+def actualizar_jugador(partida_id, jugador):
+    conn = None
+    cur = None
 
-    conn = _get_conn()
-    cur = conn.cursor()
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO jugadores (
+        cur.execute("""
+            UPDATE jugadores
+            SET posicion = %s,
+                escudo = %s,
+                perder_turno = %s
+            WHERE partida_id = %s
+              AND user_id = %s
+        """, (
+            jugador["posicion"],
+            jugador["escudo"],
+            jugador["perder_turno"],
             partida_id,
-            user_id,
-            nombre,
-            username,
-            emoji,
-            posicion,
-            escudo,
-            perder_turno
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (
-        partida_id,
-        jugador["id"],
-        jugador["nombre"],
-        jugador["username"],
-        jugador["emoji"],
-        jugador["posicion"],
-        jugador["escudo"],
-        jugador["perder_turno"]
-    ))
+            jugador["id"]
+        ))
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR ACTUALIZANDO JUGADOR: {e}"
+        )
+
+        raise
+
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
 
 # =========================================================
 # GUARDAR GANADOR EN SUPABASE
@@ -901,6 +911,10 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =====================================================
 
     jugador_actual["posicion"] = nueva_posicion
+    actualizar_jugador(
+        partida["id"],
+        jugador_actual
+    )
 
     await query.edit_message_text(
         text=(
@@ -954,6 +968,11 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         posicion_especial = 9
 
         jugador_actual["posicion"] = posicion_especial
+        
+        actualizar_jugador(
+            partida["id"],
+            jugador_actual
+        )
 
         await query.message.reply_text(
             f"🟣 ᛝ ¡AVANZA 3 CASILLAS! "
@@ -992,6 +1011,11 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if jugador_actual["posicion"] == 26:
 
         jugador_actual["escudo"] = True
+        
+        actualizar_jugador(
+            partida["id"],
+            jugador_actual
+        )
 
         await query.message.reply_text(
             f"🟣 ᛝ ¡ESCUDO! "
@@ -1088,6 +1112,11 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if jugador_actual["posicion"] == 46:
 
         jugador_actual["perder_turno"] = True
+
+        actualizar_jugador(
+            partida["id"],
+            jugador_actual
+        )
 
         await query.message.reply_text(
             f"🟠 ᛝ ¡OH, NO! "
@@ -1189,6 +1218,11 @@ async def enviar_turno(
     if jugador["perder_turno"]:
 
         jugador["perder_turno"] = False
+
+        actualizar_jugador(
+            partida["id"],
+            jugador
+        )
 
         await context.bot.send_message(
             chat_id=partida["chat_id"],
@@ -1310,6 +1344,11 @@ async def elegir_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         objetivo["escudo"] = False
 
+        actualizar_jugador(
+            partida["id"],
+            objetivo
+        )
+
         await query.message.reply_text(
             f"🛡️ ᛝ {nombre_usuario(objetivo)} "
             f"{objetivo['emoji']} tenía un escudo.\n\n"
@@ -1408,6 +1447,11 @@ async def lanzar_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         jugador["escudo"] = False
 
+        actualizar_jugador(
+            partida["id"],
+            jugador
+        )
+
         await query.message.reply_text(
             f"🎲 . . . {usuario} {jugador['emoji']} "
             f"ha sacado un {resultado}.\n\n"
@@ -1422,6 +1466,11 @@ async def lanzar_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
         jugador["posicion"] = max(
             0,
             jugador["posicion"] - resultado
+        )
+
+        actualizar_jugador(
+            partida["id"],
+            jugador
         )
 
         await query.message.reply_text(
@@ -1469,6 +1518,10 @@ async def tiempo_retroceso_agotado(context: ContextTypes.DEFAULT_TYPE):
     if jugador["escudo"]:
 
         jugador["escudo"] = False
+        actualizar_jugador(
+            partida["id"],
+            jugador
+        )
 
         await context.bot.send_message(
             chat_id=partida["chat_id"],
@@ -1486,6 +1539,11 @@ async def tiempo_retroceso_agotado(context: ContextTypes.DEFAULT_TYPE):
         jugador["posicion"] = max(
             0,
             jugador["posicion"] - 2
+        )
+
+        actualizar_jugador(
+            artida["id"],
+            jugador
         )
 
         await context.bot.send_message(

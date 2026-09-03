@@ -91,9 +91,9 @@ def guardar_partida():
                 turno,
                 turno_id,
                 activa,
-                retroceso
+                creada_en
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             RETURNING id
         """, (
             partida["chat_id"],
@@ -106,25 +106,18 @@ def guardar_partida():
         ))
 
         partida_id = cur.fetchone()[0]
-
         conn.commit()
-
         return partida_id
 
     except Exception as e:
         if conn:
             conn.rollback()
-
-        logger.error(
-            f"ERROR guardando partida en Supabase: {e}"
-        )
-
+        logger.error(f"ERROR guardando partida en Supabase: {e}")
         raise
 
     finally:
         if cur:
             cur.close()
-
         if conn:
             conn.close()
 

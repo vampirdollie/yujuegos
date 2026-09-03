@@ -62,6 +62,7 @@ reflejos = {
     "chat_id": None,
     "premio": 0,
     "emojis": [],
+    "cantidad_emojis": 5,
     "correcto": None,
     "admin_id": None,
     "mensaje_id": None,
@@ -1945,6 +1946,7 @@ async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Guardar configuración inicial
     reflejos["chat_id"] = update.effective_chat.id
     reflejos["premio"] = premio
+    reflejos["cantidad_emojis"] = cantidad_emojis
     reflejos["admin_id"] = update.effective_user.id
     reflejos["emojis"] = []
     reflejos["correcto"] = None
@@ -1963,7 +1965,8 @@ async def reflejos_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "⚡ ᛝ 𝗝𝘂𝗲𝗴𝗼 𝗱𝗲 𝗿𝗲𝗳𝗹𝗲𝗷𝗼𝘀\n\n"
                 f"๑ premio: {premio} robux\n\n"
                 f"envíame los {cantidad_emojis} emojis que vamos a usar.\n"
-                "๑ ejemplo: 🐶 🐱 🐰 🐼 🦊"
+                f"envíalos separados por espacios.\n"
+                f"๑ ejemplo: 🐶 🐱 🐰 🐼 🦊"
             )
         )
 
@@ -2022,7 +2025,8 @@ async def recibir_emojis_reflejos(
     # Deben ser exactamente 5
     if len(emojis) != 5:
         await update.message.reply_text(
-            "⚡ ᛝ necesito exactamente 5 emojis.\n\n"
+            f"⚡ ᛝ necesito exactamente "
+            f"{reflejos['cantidad_emojis']} emojis.\n\n"
             "envíalos separados por espacios.\n"
             "ejemplo:\n"
             "🐶 🐱 🐰 🐼 🦊"
@@ -2032,7 +2036,9 @@ async def recibir_emojis_reflejos(
     # No permitir emojis repetidos
     if len(set(emojis)) != 5:
         await update.message.reply_text(
-            "⚡ ᛝ los 5 emojis deben ser diferentes."
+            f"⚡ ᛝ los "
+             f"{reflejos['cantidad_emojis']} emojis "
+            "deben ser diferentes."
         )
         return
 
@@ -2056,7 +2062,8 @@ async def recibir_emojis_reflejos(
 
     await update.message.reply_text(
         "⚡ ᛝ perfecto.\n\n"
-        "ahora elige cuál de estos 5 emojis "
+        f"ahora elige cuál de estos "
+        f"{reflejos['cantidad_emojis']} emojis "
         "será el correcto:",
         reply_markup=teclado
     )

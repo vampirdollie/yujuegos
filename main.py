@@ -288,7 +288,7 @@ def guardar_ganador_reflejos(jugador, premio):
 # GUARDAR JUGADOR EN SUPABASE
 # =========================================================
 
-def actualizar_jugador(partida_id, jugador):
+def guardar_jugador(partida_id, jugador):
     conn = None
     cur = None
 
@@ -297,82 +297,42 @@ def actualizar_jugador(partida_id, jugador):
         cur = conn.cursor()
 
         cur.execute("""
-            UPDATE jugadores
-            SET posicion = %s,
-                escudo = %s,
-                perder_turno = %s
-            WHERE partida_id = %s
-              AND user_id = %s
+            INSERT INTO jugadores (
+                partida_id,
+                user_id,
+                nombre,
+                username,
+                emoji,
+                posicion,
+                escudo,
+                perder_turno
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
         """, (
-            jugador["posicion"],
-            jugador["escudo"],
-            jugador["perder_turno"],
             partida_id,
-            jugador["id"]
+            jugador["id"],
+            jugador["nombre"],
+            jugador.get("username"),
+            jugador["emoji"],
+            jugador.get("posicion", 0),
+            jugador.get("escudo", False),
+            jugador.get("perder_turno", False)
         ))
 
+        jugador_id = cur.fetchone()[0]
         conn.commit()
+        return jugador_id
 
     except Exception as e:
         if conn:
             conn.rollback()
-
-        logger.error(
-            f"ERROR ACTUALIZANDO JUGADOR: {e}"
-        )
-
+        logger.error(f"ERROR guardando jugador en Supabase: {e}")
         raise
 
     finally:
         if cur:
             cur.close()
-
-        if conn:
-            conn.close()
-
-def actualizar_partida():
-    conn = None
-    cur = None
-
-    try:
-        conn = _get_conn()
-        cur = conn.cursor()
-
-        cur.execute("""
-            UPDATE partidas
-            SET estado = %s,
-                turno = %s,
-                turno_id = %s,
-                activa = %s,
-                retroceso = %s
-            WHERE id = %s
-        """, (
-            partida["estado"],
-            partida["turno"],
-            partida["turno_id"],
-            partida["activa"],
-            psycopg2.extras.Json(partida["retroceso"])
-            if partida["retroceso"] is not None
-            else None,
-            partida["id"]
-        ))
-
-        conn.commit()
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-
-        logger.error(
-            f"ERROR ACTUALIZANDO PARTIDA: {e}"
-        )
-
-        raise
-
-    finally:
-        if cur:
-            cur.close()
-
         if conn:
             conn.close()
 

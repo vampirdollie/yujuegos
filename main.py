@@ -973,8 +973,6 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["turno"] = 0
     partida["turno_id"] += 1
 
-    actualizar_partida()
-
     # Crear lista de jugadores
     jugadores_texto = ""
 
@@ -1091,7 +1089,6 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         partida["activa"] = False
         partida["estado"] = "finalizada"
         partida["retroceso"] = None
-        actualizar_partida()
         return
 
     # =====================================================
@@ -1150,7 +1147,6 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "atacante_id": jugador_actual["id"],
             "turno_id": partida["turno_id"]
         }
-        actualizar_partida()
 
         await query.message.reply_text(
             f"{usuario} {jugador_actual['emoji']}, lanza el dado.",
@@ -1269,8 +1265,6 @@ async def pasar_turno(context: ContextTypes.DEFAULT_TYPE):
         partida["turno"] = 0
 
     partida["turno_id"] += 1
-
-    actualizar_partida()
 
     await enviar_turno(
         context,
@@ -1414,7 +1408,6 @@ async def elegir_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "atacante_id": jugador_actual["id"],
         "turno_id": partida["turno_id"]
     }
-    actualizar_partida()
 
     boton_dado = InlineKeyboardButton("lanzar ‹𝟹", callback_data="juego:retroceso_dado")
     teclado = InlineKeyboardMarkup([[boton_dado]])
@@ -1433,7 +1426,6 @@ async def elegir_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
         60,
         data={"turno_id": partida["turno_id"], "jugador_id": objetivo["id"]}
     )
-
 
 # =========================================================
 # RETROCESO DE LA CASILLA 20
@@ -1484,7 +1476,6 @@ async def lanzar_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(text=texto)
 
     partida["retroceso"] = None
-    actualizar_partida()
     await pasar_turno(update, context)
 
 # =========================================================
@@ -1560,8 +1551,6 @@ async def tiempo_retroceso_agotado(context: ContextTypes.DEFAULT_TYPE):
         )
 
     partida["retroceso"] = None
-
-    actualizar_partida()
 
     await pasar_turno(update, context)
 

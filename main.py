@@ -1209,7 +1209,7 @@ async def pasar_turno(context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================================================
-# ENVIAR TURNO (CORREGIDO)
+# ENVIAR TURNO (SIN BOTÓN INICIAL)
 # =========================================================
 
 async def enviar_turno(
@@ -1220,27 +1220,27 @@ async def enviar_turno(
     jugador = partida["jugadores"][partida["turno"]]
     usuario = nombre_usuario(jugador)
 
-    # Botón para lanzar dado
-    boton_dado = InlineKeyboardButton("lanzar ‹𝟹", callback_data="juego:lanzar")
-    teclado = InlineKeyboardMarkup([[boton_dado]])
-
-    # Mensaje del turno
+    # Mensaje del turno (solo texto, sin botón)
     mensaje = await context.bot.send_message(
         chat_id=partida["chat_id"],
         text=(
             f"𖹭 {usuario} {jugador['emoji']} "
             f"lanza el dado, ¡suerte!"
-        ),
-        reply_markup=teclado
+        )
     )
 
     partida["mensaje_turno"] = mensaje.message_id
 
-    # Temporizador de 1 minuto
+    # Cancelar jobs anteriores de este chat
+    for job in context.job_queue.get_jobs_by_name(f"turno_{partida['chat_id']}"):
+        job.schedule_removal()
+
+    # Crear nuevo temporizador de 1 minuto
     context.job_queue.run_once(
         tiempo_agotado,
         60,
-        data={"turno_id": turno_id}
+        data={"turno_id": turno_id},
+        name=f"turno_{partida['chat_id']}"
     )
 
     # =====================================================

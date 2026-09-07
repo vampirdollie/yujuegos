@@ -1034,7 +1034,8 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     teclado = InlineKeyboardMarkup([[boton_dado]])
 
     texto = (
-        f"🎲 . . . {usuario} {jugador_actual['emoji']} ha sacado un {resultado}.\n\n"
+        f"🎲 . . . {usuario} {jugador_actual['emoji']}\n"
+        f"ha sacado un {resultado}.\n\n"
         f"avanza de la casilla {posicion_actual} a la casilla {nueva_posicion}."
     )
 

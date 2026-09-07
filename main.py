@@ -716,7 +716,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Mínimo 3 jugadores
-    if max_jugadores < 1:
+    if max_jugadores < 3:
         await update.message.reply_text(
             "el juego necesita mínimo 3 jugadores."
         )

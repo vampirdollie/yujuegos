@@ -437,7 +437,7 @@ def guardar_ganador(jugador):
         if conn:
             conn.close()
 
-def restaurar_partida():
+async def restaurar_partida():
     conn = None
     cur = None
 
@@ -716,7 +716,7 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Mínimo 3 jugadores
-    if max_jugadores < 3:
+    if max_jugadores < 1:
         await update.message.reply_text(
             "el juego necesita mínimo 3 jugadores."
         )
@@ -2707,7 +2707,8 @@ async def limpiarhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cur = conn.cursor()
 
         cur.execute(
-            "DELETE FROM ganadores_ruleta"
+            "DELETE FROM ganadores_ruleta WHERE chat_id = %s",
+            (update.effective_chat.id,)
         )
 
         conn.commit()
@@ -2852,6 +2853,20 @@ app.add_handler(
         pattern=r"^reflejos:jugar:"
     )
 )
+
+# =========================================================
+# POST_INIT - RESTAURAR PARTIDAS AL INICIAR
+# =========================================================
+
+async def post_init(app: Application):
+    """Se ejecuta cuando la app inicia"""
+    logger.info("🤖 Bot iniciando...")
+    if await restaurar_partida():
+        logger.info("✅ Partida anterior restaurada correctamente")
+    else:
+        logger.info("ℹ️ No hay partida activa para restaurar")
+
+app.post_init = post_init
 
 # =========================================================
 # WEBHOOK

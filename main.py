@@ -1220,29 +1220,6 @@ async def enviar_turno(
     jugador = partida["jugadores"][partida["turno"]]
     usuario = nombre_usuario(jugador)
 
-    # Mensaje del turno (solo texto, sin botón)
-    mensaje = await context.bot.send_message(
-        chat_id=partida["chat_id"],
-        text=(
-            f"𖹭 {usuario} {jugador['emoji']} "
-            f"lanza el dado, ¡suerte!"
-        )
-    )
-
-    partida["mensaje_turno"] = mensaje.message_id
-
-    # Cancelar jobs anteriores de este chat
-    for job in context.job_queue.get_jobs_by_name(f"turno_{partida['chat_id']}"):
-        job.schedule_removal()
-
-    # Crear nuevo temporizador de 1 minuto
-    context.job_queue.run_once(
-        tiempo_agotado,
-        60,
-        data={"turno_id": turno_id},
-        name=f"turno_{partida['chat_id']}"
-    )
-
     # =====================================================
     # PERDER TURNO
     # =====================================================
@@ -1282,7 +1259,7 @@ async def enviar_turno(
     ])
 
     # =====================================================
-    # MENSAJE DEL TURNO
+    # MENSAJE DEL TURNO (ÚNICO)
     # =====================================================
 
     mensaje = await context.bot.send_message(
@@ -1296,17 +1273,23 @@ async def enviar_turno(
     partida["mensaje_turno"] = mensaje.message_id
 
     # =====================================================
-    # TEMPORIZADOR DE 1 MINUTO
+    # CANCELAR JOBS ANTERIORES
+    # =====================================================
+
+    for job in context.job_queue.get_jobs_by_name(f"turno_{partida['chat_id']}"):
+        job.schedule_removal()
+
+    # =====================================================
+    # TEMPORIZADOR DE 1 MINUTO (ÚNICO)
     # =====================================================
 
     context.job_queue.run_once(
         tiempo_agotado,
         60,
-        data={
-            "turno_id": turno_id
-        }
+        data={"turno_id": turno_id},
+        name=f"turno_{partida['chat_id']}"
     )
-
+    
 # =========================================================
 # CASILLA 20: ELEGIR JUGADOR
 # =========================================================

@@ -1065,7 +1065,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         actualizar_jugador(partida["id"], jugador_actual)
         texto += (
             f"\n\n🟣 ᛝ ¡AVANZA 3 CASILLAS!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f" ⸜(｡˃ ᵕ ˂ )⸝\n\n"
             f"{usuario} {jugador_actual['emoji']} avanza de la casilla 6 a la casilla 9."
         )
 
@@ -1073,7 +1073,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if jugador_actual["posicion"] == 14:
         texto += (
             f"\n\n🟣 ᛝ ¡DADO EXTRA!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f" ⸜(｡˃ ᵕ ˂ )⸝\n\n"
             f"{usuario} {jugador_actual['emoji']} tiene la oportunidad de lanzar otra vez."
         )
         await query.edit_message_text(text=texto, reply_markup=teclado)
@@ -1087,7 +1087,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         actualizar_jugador(partida["id"], jugador_actual)
         texto += (
             f"\n\n🟣 ᛝ ¡ESCUDO!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f" ⸜(｡˃ ᵕ ˂ )⸝\n\n"
             f"{usuario} {jugador_actual['emoji']} ha conseguido un escudo. 🛡️"
         )
 
@@ -1095,7 +1095,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if jugador_actual["posicion"] == 32:
         texto += (
             f"\n\n🟠 ᛝ ¡LANZA DE NUEVO!\n"
-            f" (っ˕ -｡)\n"
+            f" (っ˕ -｡)\n\n"
             f"{usuario} {jugador_actual['emoji']} debe lanzar otra vez y retroceder esa cantidad. :("
         )
         await query.edit_message_text(text=texto, reply_markup=teclado)
@@ -1112,7 +1112,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         actualizar_jugador(partida["id"], jugador_actual)
         texto += (
             f"\n\n🟠 ᛝ ¡OH, NO!\n"
-            f" (っ˕ -｡)\n"
+            f" (っ˕ -｡)\n\n"
             f"{usuario} {jugador_actual['emoji']} pierde su siguiente turno. :("
         )
 

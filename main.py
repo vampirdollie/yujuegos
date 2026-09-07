@@ -1417,7 +1417,7 @@ async def lanzar_retroceso(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(text=texto)
 
     partida["retroceso"] = None
-    await pasar_turno(update, context)
+    await pasar_turno(context)
 
 # =========================================================
 # TIEMPO AGOTADO — RETROCESO
@@ -1493,7 +1493,7 @@ async def tiempo_retroceso_agotado(context: ContextTypes.DEFAULT_TYPE):
 
     partida["retroceso"] = None
 
-    await pasar_turno(update, context)
+    await pasar_turno(context)
 
 # =========================================================
 # /CANCELARJUEGO

@@ -886,10 +886,10 @@ async def sillas_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 2:
 
         await update.message.reply_text(
-            "🪑 ᛝ uso correcto:\n\n"
+            "🪑 ᛝ uso correcto:\n"
             "/sillas <robux> <cupos>\n\n"
             "ejemplo:\n"
-            "/sillas 100 8"
+            "/sillas 30 7"
         )
 
         return
@@ -1021,7 +1021,7 @@ async def sillas_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
 
     await update.message.reply_text(
-        "⠀⠀⠀🪑 **SILLAS NUMÉRICAS**\n\n"
+        "⠀⠀⠀🪑 SILLAS NUMÉRICAS\n\n"
         f"⠀⠀⠀✿ premio: {premio} robux\n"
         f"⠀⠀⠀✿ cupos: {cupos}\n"
         f"⠀⠀⠀✿ sillas iniciales: {cupos - 1}\n\n"
@@ -1178,7 +1178,7 @@ async def sillas_unirse(
     )
 
     await query.message.reply_text(
-        f"🪑 {usuario} se ha unido.\n"
+        f"🪑 ᛝ {usuario} se ha unido.\n"
         f"quedan {restantes} cupos."
     )
 
@@ -1701,7 +1701,7 @@ async def cerrar_ronda_sillas(
         await context.bot.send_message(
             chat_id=sillas["chat_id"],
             text=(
-                "🪑 ᛝ ¡TENEMOS GANADOR!\n\n"
+                "🪑 ᛝ ¡TENEMOS UN GANADOR!\n\n"
                 f"✿ {ganador['nombre']}\n\n"
                 f"✿ PREMIO: {sillas['premio']} R$\n\n"
                 "🎉 ¡FELICIDADES! 𖹭"
@@ -1880,7 +1880,7 @@ async def ejecutar_ronda_sillas(
         await context.bot.send_message(
             chat_id=sillas["chat_id"],
             text=(
-                "🪑 ᛝ no encontré los audios de SILLAS.\n\n"
+                "🪑 ᛝ no encontré los audios de sillas.\n\n"
                 "revisa que los archivos .mp3 estén "
                 "junto a main.py y que los nombres "
                 "coincidan con AUDIOS_SILLAS."
@@ -2242,7 +2242,7 @@ async def cancelarsillas(
     sillas["jugadores"] = []
 
     await update.message.reply_text(
-        "🛑 ᛝ ¡SILLAS NUMÉRICAS canceladas!\n\n"
+        "🛑 ᛝ ¡SILLAS CANCELADAS!\n"
         "la partida ha sido detenida."
     )
 

@@ -1040,7 +1040,7 @@ async def sillas_unirse(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     jugador = {
-        "id": user_id,
+        "user_id": user_id,
         "nombre": query.from_user.full_name,
         "username": query.from_user.username,
         "eliminado": False,
@@ -1115,6 +1115,746 @@ async def sillas_unirse(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(
         f"🪑 {usuario} se ha unido.\n"
         f"quedan {restantes} cupos."
+    )
+
+# --- START SILLAS ---
+
+async def startsillas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+
+    if not es_admin(user_id):
+        await update.message.reply_text(
+            "solo los admins pueden iniciar las sillas."
+        )
+        return
+
+    if not sillas["activa"]:
+        await update.message.reply_text(
+            "𖦹 no hay una partida de sillas activa."
+        )
+        return
+
+    jugadores_activos = [
+        j for j in sillas["jugadores"]
+        if not j.get("eliminado", False)
+    ]
+
+    if len(jugadores_activos) < 3:
+        await update.message.reply_text(
+            "𖦹 se necesitan mínimo 3 participantes para comenzar."
+        )
+        return
+
+    # Evitar iniciar dos veces
+    if sillas["fase"] != "esperando":
+        await update.message.reply_text(
+            "𖦹 las sillas ya comenzaron."
+        )
+        return
+
+    sillas["fase"] = "iniciando"
+
+    # Guardar estado en DB
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE partidas_sillas
+        SET estado = 'jugando',
+            fase = 'iniciando'
+        WHERE id = %s
+    """, (sillas["id"],))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    await update.message.reply_text(
+        "⠀⠀⠀🪑 𝗦𝗜𝗟𝗟𝗔𝗦 𝗡𝗨𝗠𝗘́𝗥𝗜𝗖𝗔𝗦\n\n"
+        "⠀⠀⠀𖦹 la partida está por comenzar...\n"
+        "⠀⠀⠀𖦹 prepárense todos los participantes. 🐇"
+    )
+
+    await asyncio.sleep(2)
+
+    # Comenzar primera ronda
+    await ejecutar_ronda_sillas(context)
+
+# --- RESPUESTA 🪑 DE SILLAS ---
+
+async def silla_respuesta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
+    texto = update.message.text.strip()
+
+    if texto != "🪑":
+        return
+
+    # No hay partida activa
+    if not sillas["activa"]:
+        return
+
+    # Solo cuenta durante la fase de respuesta
+    if sillas["fase"] != "respondiendo":
+        return
+
+    chat_id = update.effective_chat.id
+
+    # Solo cuenta en el grupo donde está la partida
+    if chat_id != sillas["chat_id"]:
+        return
+
+    user_id = str(update.effective_user.id)
+
+    # Buscar jugador
+    jugador = None
+
+    for j in sillas["jugadores"]:
+        if str(j["user_id"]) == user_id:
+            jugador = j
+            break
+
+    # No es jugador
+    if jugador is None:
+        return
+
+    # Si ya fue eliminado, no puede jugar
+    if jugador.get("eliminado", False):
+        return
+
+    # Una sola 🪑 por ronda
+    if user_id in sillas["respuestas"]:
+        return
+
+    # Registrar respuesta en el orden en que llegó
+    orden = len(sillas["respuestas"]) + 1
+
+    sillas["respuestas"][user_id] = orden
+
+    # Guardar respuestas en Supabase
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE partidas_sillas
+            SET respuestas = %s
+            WHERE id = %s
+            """,
+            (
+                json.dumps(sillas["respuestas"]),
+                sillas["id"]
+            )
+        )
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.exception(
+            "Error guardando respuesta de SILLAS: %s",
+            e
+        )
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    # Si todavía no se han ocupado todas las sillas,
+    # seguimos esperando
+    if len(sillas["respuestas"]) < sillas["sillas_actuales"]:
+        return
+
+    # Ya llegaron suficientes respuestas para ocupar
+    # todas las sillas.
+    #
+    # La siguiente persona que responda será eliminada.
+    #
+    # Si ya respondió exactamente el último jugador
+    # necesario y quedan jugadores sin responder,
+    # todavía no eliminamos a nadie aquí.
+    #
+    # Esperamos a que llegue la siguiente respuesta.
+
+# --- CERRAR RONDA DE SILLAS ---
+
+async def cerrar_ronda_sillas(context: ContextTypes.DEFAULT_TYPE):
+    await asyncio.sleep(3)
+
+    if not sillas["activa"]:
+        return
+
+    if sillas["fase"] != "respondiendo":
+        return
+
+    jugadores_activos = [
+        j for j in sillas["jugadores"]
+        if not j.get("eliminado", False)
+    ]
+
+    respuestas = sillas["respuestas"]
+
+    # Ordenar jugadores según el orden en que respondieron
+    jugadores_respondieron = []
+
+    for jugador in jugadores_activos:
+        uid = str(jugador["user_id"])
+
+        if uid in respuestas:
+            jugadores_respondieron.append(
+                (
+                    respuestas[uid],
+                    jugador
+                )
+            )
+
+    jugadores_respondieron.sort(key=lambda x: x[0])
+
+    # Los primeros ocupan las sillas.
+    jugadores_salvados = [
+        jugador
+        for _, jugador in jugadores_respondieron[:sillas["sillas_actuales"]]
+    ]
+
+    ids_salvados = {
+        str(j["user_id"])
+        for j in jugadores_salvados
+    }
+
+    # Los que quedaron fuera de las sillas
+    jugadores_fuera = [
+        jugador
+        for jugador in jugadores_activos
+        if str(jugador["user_id"]) not in ids_salvados
+    ]
+
+    if not jugadores_fuera:
+        return
+
+    # Normalmente será exactamente 1.
+    # Si alguien no respondió, queda fuera.
+    eliminado = jugadores_fuera[0]
+
+    eliminado["eliminado"] = True
+    eliminado["ronda_eliminacion"] = sillas["ronda"]
+
+    # Guardar eliminación
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE jugadores_sillas
+            SET eliminado = TRUE,
+                ronda_eliminacion = %s
+            WHERE partida_id = %s
+              AND user_id = %s
+            """,
+            (
+                sillas["ronda"],
+                sillas["id"],
+                int(eliminado["user_id"])
+            )
+        )
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.exception(
+            "Error guardando eliminación de SILLAS: %s",
+            e
+        )
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    # Nombre para mostrar
+    nombre_eliminado = eliminado["nombre"]
+
+    await context.bot.send_message(
+        chat_id=sillas["chat_id"],
+        text=(
+            f"RONDA {sillas['ronda']} TERMINADA\n\n"
+            f"• ᴖ • {nombre_eliminado} queda eliminado.\n\n"
+            f"𖹭 quedan "
+            f"{len(jugadores_activos) - 1} jugadores."
+        )
+    )
+
+    # Jugadores que quedan
+    jugadores_restantes = [
+        j for j in sillas["jugadores"]
+        if not j.get("eliminado", False)
+    ]
+
+    # Si queda uno → GANADOR
+    if len(jugadores_restantes) == 1:
+
+        ganador = jugadores_restantes[0]
+
+        sillas["fase"] = "finalizada"
+        sillas["estado"] = "finalizada"
+        sillas["activa"] = False
+
+        conn = None
+        cur = None
+
+        try:
+            conn = _get_conn()
+            cur = conn.cursor()
+
+            # Finalizar partida
+            cur.execute(
+                """
+                UPDATE partidas_sillas
+                SET estado = 'finalizada',
+                    fase = 'finalizada',
+                    activa = FALSE,
+                    finalizada_en = NOW()
+                WHERE id = %s
+                """,
+                (sillas["id"],)
+            )
+
+            # Guardar ganador en historial
+            cur.execute(
+                """
+                INSERT INTO ganadores_ruleta
+                (
+                    ruleta_id,
+                    chat_id,
+                    user_id,
+                    nombre,
+                    username,
+                    premio,
+                    tipo
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 'sillas')
+                """,
+                (
+                    sillas["id"],
+                    sillas["chat_id"],
+                    int(ganador["user_id"]),
+                    ganador["nombre"],
+                    ganador.get("username"),
+                    sillas["premio"]
+                )
+            )
+
+            conn.commit()
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+
+            logger.exception(
+                "Error guardando ganador de SILLAS: %s",
+                e
+            )
+
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+        await context.bot.send_message(
+            chat_id=sillas["chat_id"],
+            text=(
+                "🪑 ᛝ ¡TENEMOS GANADOR!\n\n"
+                f"✿ {ganador['nombre']}\n\n"
+                f"✿ PREMIO: {sillas['premio']} R$\n\n"
+                "🎉 ¡FELICIDADES! 𖹭"
+            )
+        )
+
+        return
+
+    # Nueva ronda
+    sillas["ronda"] += 1
+    sillas["sillas_actuales"] = len(jugadores_restantes) - 1
+    sillas["respuestas"] = {}
+    sillas["fase"] = "musica"
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE partidas_sillas
+            SET ronda = %s,
+                sillas_actuales = %s,
+                fase = 'musica',
+                respuestas = '{}'::jsonb,
+                ronda_iniciada_en = NOW()
+            WHERE id = %s
+            """,
+            (
+                sillas["ronda"],
+                sillas["sillas_actuales"],
+                sillas["id"]
+            )
+        )
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.exception(
+            "Error preparando nueva ronda de SILLAS: %s",
+            e
+        )
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    # Pequeña pausa antes de la siguiente ronda
+    await asyncio.sleep(2)
+
+    await context.bot.send_message(
+        chat_id=sillas["chat_id"],
+        text=(
+            f"🪑 ᛝ RONDA {sillas['ronda']}\n\n"
+            f"✿ jugadores: {len(jugadores_restantes)}\n"
+            f"✿ sillas: {sillas['sillas_actuales']}\n\n"
+            "٩(ˊᗜˋ*)و ¡prepárense!"
+        )
+    )
+
+    # Reutilizamos startsillas para ejecutar la ronda
+    await ejecutar_ronda_sillas(context)
+
+# --- EJECUTAR UNA RONDA DE SILLAS ---
+
+async def ejecutar_ronda_sillas(context: ContextTypes.DEFAULT_TYPE):
+
+    if not sillas["activa"]:
+        return
+
+    if len([
+        j for j in sillas["jugadores"]
+        if not j.get("eliminado", False)
+    ]) <= 1:
+        return
+
+    sillas["fase"] = "musica"
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE partidas_sillas
+            SET fase = 'musica'
+            WHERE id = %s
+            """,
+            (sillas["id"],)
+        )
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.exception(
+            "Error actualizando fase de SILLAS: %s",
+            e
+        )
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    await asyncio.sleep(1)
+
+    if not sillas["activa"]:
+        return
+
+    # Buscar audios existentes
+    audios_existentes = [
+        audio
+        for audio in AUDIOS_SILLAS
+        if os.path.exists(audio)
+    ]
+
+    if not audios_existentes:
+        await context.bot.send_message(
+            chat_id=sillas["chat_id"],
+            text="no encontré los audios de sillas. ."
+        )
+        return
+
+    # Si ya usamos todos, volvemos a llenar la lista
+    if not audios_sillas_disponibles:
+        audios_sillas_disponibles.extend(audios_existentes)
+        random.shuffle(audios_sillas_disponibles)
+
+    audio_actual = audios_sillas_disponibles.pop()
+
+    sillas["audio_actual"] = audio_actual
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE partidas_sillas
+            SET audio_actual = %s
+            WHERE id = %s
+            """,
+            (
+                audio_actual,
+                sillas["id"]
+            )
+        )
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.exception(
+            "Error guardando audio de SILLAS: %s",
+            e
+        )
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    # Enviar audio
+    try:
+        with open(audio_actual, "rb") as audio:
+            await context.bot.send_audio(
+                chat_id=sillas["chat_id"],
+                audio=audio
+            )
+    except Exception as e:
+        logger.exception(
+            "Error enviando audio de SILLAS: %s",
+            e
+        )
+
+    await asyncio.sleep(2)
+
+    if not sillas["activa"]:
+        return
+
+    # Cuenta regresiva
+    sillas["fase"] = "cuenta"
+
+    for numero in [3, 2, 1]:
+
+        if not sillas["activa"]:
+            return
+
+        await context.bot.send_message(
+            chat_id=sillas["chat_id"],
+            text=str(numero)
+        )
+
+        await asyncio.sleep(1)
+
+    if not sillas["activa"]:
+        return
+
+    # ¡YA!
+    sillas["fase"] = "respondiendo"
+    sillas["respuestas"] = {}
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            UPDATE partidas_sillas
+            SET fase = 'respondiendo',
+                respuestas = '{}'::jsonb,
+                ronda_iniciada_en = NOW()
+            WHERE id = %s
+            """,
+            (sillas["id"],)
+        )
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        logger.exception(
+            "Error iniciando respuestas de SILLAS: %s",
+            e
+        )
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    await context.bot.send_message(
+        chat_id=sillas["chat_id"],
+        text=(
+            "🪑🪑🪑🪑🪑\n\n"
+            "( •̀⤙•́ ) ¡YA!\n\n"
+            f"hay {sillas['sillas_actuales']} sillas.\n"
+            "¡rápido! 𖹭"
+        )
+    )
+
+    # Esperar las respuestas
+    await cerrar_ronda_sillas(context)
+
+# =========================================================
+# /CANCELARSILLAS
+# =========================================================
+
+async def cancelarsillas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "este comando solo puede utilizarse en un grupo."
+        )
+        return
+
+    if not await es_admin(update, update.effective_user.id):
+        await update.message.reply_text(
+            "🪑 ᛝ solo los administradores pueden "
+            "cancelar las sillas. ૮꒰ “. . ꒱ა"
+        )
+        return
+
+    if not sillas["activa"]:
+        await update.message.reply_text(
+            "🪑 ᛝ no hay ninguna partida de sillas activa."
+        )
+        return
+
+    chat_id = sillas["chat_id"]
+    partida_id = sillas["id"]
+
+    # =====================================================
+    # MARCAR PARTIDA COMO CANCELADA
+    # =====================================================
+
+    conn = None
+    cur = None
+
+    try:
+
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            UPDATE partidas_sillas
+            SET
+                activa = FALSE,
+                estado = %s,
+                fase = %s,
+                finalizada_en = NOW()
+            WHERE id = %s
+        """, (
+            "cancelada",
+            "cancelada",
+            partida_id
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR CANCELANDO SILLAS: {e}"
+        )
+
+        await update.message.reply_text(
+            "🪑 ᛝ ocurrió un error al cancelar "
+            "la partida."
+        )
+
+        return
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+    # =====================================================
+    # CANCELAR EN MEMORIA
+    # =====================================================
+
+    sillas["activa"] = False
+    sillas["chat_id"] = None
+    sillas["premio"] = 0
+    sillas["max_jugadores"] = 0
+    sillas["ronda"] = 1
+    sillas["sillas_actuales"] = 0
+    sillas["estado"] = "cancelada"
+    sillas["fase"] = "cancelada"
+    sillas["mensaje_id"] = None
+    sillas["audio_actual"] = None
+    sillas["respuestas"] = {}
+    sillas["ronda_iniciada_en"] = None
+    sillas["tiempo_limite"] = None
+    sillas["jugadores"] = []
+
+    await update.message.reply_text(
+        "🛑 ᛝ **SILLAS CANCELADAS**\n\n"
+        "la partida ha sido cancelada.\n"
+        "nadie recibe premio. ૮꒰ ˶• ༝ •˶꒱ა"
     )
 
 # =========================================================
@@ -3272,6 +4012,13 @@ app.add_handler(
     MessageHandler(
         filters.TEXT & filters.ChatType.PRIVATE,
         recibir_emojis_reflejos
+    )
+)
+
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        silla_respuesta
     )
 )
 

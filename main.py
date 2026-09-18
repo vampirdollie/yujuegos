@@ -1,6 +1,7 @@
 import os
 import logging
 import random
+import asyncio
 import psycopg2
 import psycopg2.extras
 
@@ -39,6 +40,177 @@ def _get_conn():
         DATABASE_URL,
         connect_timeout=10
     )
+
+# =========================================================
+# AUDIOS - SILLAS
+# =========================================================
+
+AUDIOS_SILLAS = [
+    "wave to earth.mp3",
+    "LOST IN PARADISE.mp3",
+    "Great Fairy Fountain.mp3",
+    "Summer Days.mp3",
+    "Into It.mp3",
+    "Where our blue is.mp3",
+    "All i Need.mp3",
+    "Delirious.mp3",
+    "if I Am with you.mp3"
+]
+
+audios_sillas_disponibles = []
+
+# =========================================================
+# SILLAS NUMÉRICAS
+# =========================================================
+
+sillas = {
+    "id": None,
+    "activa": False,
+    "chat_id": None,
+    "premio": 0,
+    "max_jugadores": 0,
+    "ronda": 1,
+    "sillas_actuales": 0,
+    "estado": "esperando",
+    "fase": "esperando",
+    "mensaje_id": None,
+    "audio_actual": None,
+    "respuestas": {},
+    "ronda_iniciada_en": None,
+    "tiempo_limite": None,
+    "jugadores": []
+}
+
+# =========================================================
+# RESTAURAR PARTIDA DE SILLAS
+# =========================================================
+
+async def restaurar_partida_sillas():
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT
+                id,
+                chat_id,
+                premio,
+                max_jugadores,
+                estado,
+                ronda,
+                sillas_actuales,
+                activa,
+                fase,
+                mensaje_id,
+                audio_actual,
+                respuestas,
+                ronda_iniciada_en,
+                tiempo_limite
+            FROM partidas_sillas
+            WHERE activa = TRUE
+            ORDER BY id DESC
+            LIMIT 1
+        """)
+
+        partida_db = cur.fetchone()
+
+        if not partida_db:
+            logger.info(
+                "No hay ninguna partida de SILLAS activa para restaurar."
+            )
+            return False
+
+        (
+            partida_id,
+            chat_id,
+            premio,
+            max_jugadores,
+            estado,
+            ronda,
+            sillas_actuales,
+            activa,
+            fase,
+            mensaje_id,
+            audio_actual,
+            respuestas,
+            ronda_iniciada_en,
+            tiempo_limite
+        ) = partida_db
+
+        cur.execute("""
+            SELECT
+                user_id,
+                nombre,
+                username,
+                eliminado,
+                ronda_eliminacion
+            FROM jugadores_sillas
+            WHERE partida_id = %s
+            ORDER BY id ASC
+        """, (partida_id,))
+
+        jugadores_db = cur.fetchall()
+
+        jugadores = []
+
+        for jugador in jugadores_db:
+            (
+                user_id,
+                nombre,
+                username,
+                eliminado,
+                ronda_eliminacion
+            ) = jugador
+
+            jugadores.append({
+                "id": user_id,
+                "nombre": nombre,
+                "username": username,
+                "eliminado": eliminado,
+                "ronda_eliminacion": ronda_eliminacion
+            })
+
+        sillas["id"] = partida_id
+        sillas["activa"] = activa
+        sillas["chat_id"] = chat_id
+        sillas["premio"] = premio
+        sillas["max_jugadores"] = max_jugadores
+        sillas["ronda"] = ronda
+        sillas["sillas_actuales"] = sillas_actuales
+        sillas["estado"] = estado
+        sillas["fase"] = fase
+        sillas["mensaje_id"] = mensaje_id
+        sillas["audio_actual"] = audio_actual
+        sillas["respuestas"] = respuestas or {}
+        sillas["ronda_iniciada_en"] = ronda_iniciada_en
+        sillas["tiempo_limite"] = tiempo_limite
+        sillas["jugadores"] = jugadores
+
+        logger.info(
+            f"SILLAS RESTAURADO: "
+            f"id={partida_id}, "
+            f"jugadores={len(jugadores)}, "
+            f"ronda={ronda}, "
+            f"fase={fase}"
+        )
+
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"ERROR RESTAURANDO SILLAS: {e}"
+        )
+        return False
+
+    finally:
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
 
 # =========================================================
 # RULETA
@@ -665,6 +837,284 @@ async def cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         texto
+    )
+
+# =========================================================
+# /SILLAS
+# =========================================================
+
+async def sillas_comando(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "este comando solo puede utilizarse en un grupo."
+        )
+        return
+
+    if not es_admin(update.effective_user.id):
+        await update.message.reply_text(
+            "🪑 ᛝ solo los administradores pueden crear "
+            "una partida de sillas."
+        )
+        return
+
+    if len(context.args) != 2:
+        await update.message.reply_text(
+            "uso correcto:\n"
+            "/sillas <robux> <cupos>\n\n"
+            "ejemplo:\n"
+            "/sillas 30 8"
+        )
+        return
+
+    try:
+        premio = int(context.args[0])
+        cupos = int(context.args[1])
+    except ValueError:
+        await update.message.reply_text(
+            "el premio y los cupos deben ser números enteros."
+        )
+        return
+
+    if premio <= 0:
+        await update.message.reply_text(
+            "el premio debe ser mayor que 0."
+        )
+        return
+
+    if cupos < 3:
+        await update.message.reply_text(
+            "se necesitan mínimo 3 jugadores."
+        )
+        return
+
+    if cupos > 15:
+        await update.message.reply_text(
+            "el máximo es de 15 jugadores."
+        )
+        return
+
+    if sillas["activa"]:
+        await update.message.reply_text(
+            "🪑 ᛝ ya hay una partida de sillas activa."
+        )
+        return
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO partidas_sillas (
+                chat_id,
+                premio,
+                max_jugadores,
+                estado,
+                ronda,
+                sillas_actuales,
+                activa,
+                fase
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, TRUE, %s)
+            RETURNING id
+        """, (
+            update.effective_chat.id,
+            premio,
+            cupos,
+            "esperando",
+            1,
+            cupos - 1,
+            "esperando"
+        ))
+
+        partida_id = cur.fetchone()[0]
+
+        conn.commit()
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR CREANDO SILLAS: {e}"
+        )
+
+        await update.message.reply_text(
+            "🪑 ᛝ ocurrió un error al crear la partida."
+        )
+
+        return
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+    # Guardar en memoria
+    sillas["id"] = partida_id
+    sillas["activa"] = True
+    sillas["chat_id"] = update.effective_chat.id
+    sillas["premio"] = premio
+    sillas["max_jugadores"] = cupos
+    sillas["ronda"] = 1
+    sillas["sillas_actuales"] = cupos - 1
+    sillas["estado"] = "esperando"
+    sillas["fase"] = "esperando"
+    sillas["mensaje_id"] = None
+    sillas["audio_actual"] = None
+    sillas["respuestas"] = {}
+    sillas["ronda_iniciada_en"] = None
+    sillas["tiempo_limite"] = None
+    sillas["jugadores"] = []
+
+    teclado = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "（˶•̀ ᎑-˶）UNIRME",
+                callback_data=f"sillas_unirse:{partida_id}"
+            )
+        ]
+    ])
+
+    await update.message.reply_text(
+        "⠀⠀⠀🪑 **SILLAS NUMÉRICAS**\n\n"
+        f"⠀⠀⠀premio: {premio} robux\n"
+        f"⠀⠀⠀cupos: {cupos}\n"
+        "⠀⠀⠀pulsa el botón para unirte.\n\n"
+        "⠀⠀⠀cuando estén listos, un admin\n"
+        "⠀⠀⠀puede iniciar la partida. 𖹭",
+        reply_markup=teclado
+    )
+
+# =========================================================
+# BOTÓN: UNIRSE A SILLAS
+# =========================================================
+
+async def sillas_unirse(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    _, partida_id = query.data.split(":")
+
+    partida_id = int(partida_id)
+
+    if not sillas["activa"] or sillas["id"] != partida_id:
+        await query.answer(
+            "esta partida ya no está disponible.",
+            show_alert=True
+        )
+        return
+
+    if sillas["fase"] != "esperando":
+        await query.answer(
+            "la partida ya comenzó.",
+            show_alert=True
+        )
+        return
+
+    user_id = query.from_user.id
+
+    if str(user_id) in [
+        str(jugador["id"])
+        for jugador in sillas["jugadores"]
+    ]:
+        await query.answer(
+            "ya estás dentro del juego.",
+            show_alert=True
+        )
+        return
+
+    if len(sillas["jugadores"]) >= sillas["max_jugadores"]:
+        await query.answer(
+            "la partida ya está llena.",
+            show_alert=True
+        )
+        return
+
+    jugador = {
+        "id": user_id,
+        "nombre": query.from_user.full_name,
+        "username": query.from_user.username,
+        "eliminado": False,
+        "ronda_eliminacion": None
+    }
+
+    conn = None
+    cur = None
+
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO jugadores_sillas (
+                partida_id,
+                user_id,
+                nombre,
+                username,
+                eliminado
+            )
+            VALUES (%s, %s, %s, %s, FALSE)
+        """, (
+            partida_id,
+            jugador["id"],
+            jugador["nombre"],
+            jugador["username"]
+        ))
+
+        conn.commit()
+
+    except Exception as e:
+
+        if conn:
+            conn.rollback()
+
+        logger.error(
+            f"ERROR UNIENDO A SILLAS: {e}"
+        )
+
+        await query.answer(
+            "ocurrió un error al unirte.",
+            show_alert=True
+        )
+
+        return
+
+    finally:
+
+        if cur:
+            cur.close()
+
+        if conn:
+            conn.close()
+
+    sillas["jugadores"].append(jugador)
+
+    restantes = (
+        sillas["max_jugadores"]
+        - len(sillas["jugadores"])
+    )
+
+    if jugador["username"]:
+        usuario = f"@{jugador['username']}"
+    else:
+        usuario = jugador["nombre"]
+
+    await query.answer(
+        "¡te has unido al juego!"
+    )
+
+    await query.message.reply_text(
+        f"🪑 {usuario} se ha unido.\n"
+        f"quedan {restantes} cupos."
     )
 
 # =========================================================

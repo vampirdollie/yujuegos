@@ -3257,6 +3257,18 @@ app.add_handler(
 )
 
 app.add_handler(
+    CommandHandler("sillas", sillas_comando)
+)
+
+app.add_handler(
+    CommandHandler("startsillas", startsillas)
+)
+
+app.add_handler(
+    CommandHandler("cancelarsillas", cancelarsillas)
+)
+
+app.add_handler(
     MessageHandler(
         filters.TEXT & filters.ChatType.PRIVATE,
         recibir_emojis_reflejos
@@ -3302,6 +3314,13 @@ app.add_handler(
     CallbackQueryHandler(
         jugar_reflejos,
         pattern=r"^reflejos:jugar:"
+    )
+)
+
+app.add_handler(
+    CallbackQueryHandler(
+        sillas_unirse,
+        pattern=r"^sillas_unirse:"
     )
 )
 

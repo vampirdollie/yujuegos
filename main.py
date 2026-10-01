@@ -2627,40 +2627,81 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"a la casilla {nueva_posicion}."
     )
 
-    # =====================================================
-    # CASILLA 51 — GANADOR
-    # =====================================================
+# =========================================================
+# BOTÓN: LANZAR DADO
+# =========================================================
 
-    if nueva_posicion >= 51:
+async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        # La posición final siempre es 51
+    query = update.callback_query
+
+    if not partida["activa"]:
+        await query.answer(
+            "no hay una partida activa. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    if partida["estado"] != "jugando":
+        await query.answer(
+            "la partida todavía no ha comenzado. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    jugador_actual = partida["jugadores"][partida["turno"]]
+
+    if query.from_user.id != jugador_actual["id"]:
+        await query.answer(
+            "no es tu turno. (╥﹏╥)",
+            show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    partida["turno_id"] += 1
+
+    resultado = random.randint(1, 6)
+
+    usuario = nombre_usuario(jugador_actual)
+
+    posicion_actual = jugador_actual["posicion"]
+
+    nueva_posicion = posicion_actual + resultado
+
+    boton_dado = InlineKeyboardButton(
+        "lanzar ‹𝟹",
+        callback_data="juego:lanzar"
+    )
+
+    teclado = InlineKeyboardMarkup([
+        [boton_dado]
+    ])
+
+    texto = (
+        f"🎲 . . . {usuario} {jugador_actual['emoji']}\n "
+        f"ha sacado un {resultado}.\n\n"
+        f"avanza de la casilla {posicion_actual} "
+        f"a la casilla {nueva_posicion}."
+    )
+
+    # ganador: debe llegar EXACTAMENTE a 51
+    if nueva_posicion == 51:
         jugador_actual["posicion"] = 51
 
         try:
-            actualizar_jugador(
-                partida["id"],
-                jugador_actual
-            )
+            actualizar_jugador(partida["id"], jugador_actual)
         except Exception as e:
-            logger.error(
-                f"ERROR ACTUALIZANDO GANADOR: {e}"
-            )
+            logger.error(f"ERROR ACTUALIZANDO GANADOR: {e}")
 
         try:
-            guardar_ganador(
-                jugador_actual
-            )
+            guardar_ganador(jugador_actual)
         except Exception as e:
-            logger.error(
-                f"ERROR GUARDANDO GANADOR: {e}"
-            )
+            logger.error(f"ERROR GUARDANDO GANADOR: {e}")
 
-        # Mostrar primero la tirada
-        await query.edit_message_text(
-            text=texto
-        )
+        await query.edit_message_text(text=texto)
 
-        # Mostrar el ganador en un mensaje separado
         await query.message.reply_text(
             text=(
                 f"ꉂ(˵˃ ᗜ ˂˵) ᛝ "
@@ -2671,17 +2712,31 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         )
 
-        # Cerrar partida
         partida["activa"] = False
         partida["estado"] = "finalizada"
         partida["retroceso"] = None
 
-        # Cancelar temporizador actual
         for job in context.job_queue.get_jobs_by_name(
             f"turno_{partida['chat_id']}"
         ):
             job.schedule_removal()
 
+        return
+
+    # si se pasa de 51, no avanza
+    if nueva_posicion > 51:
+        texto = (
+            f"🎲 . . . {usuario} {jugador_actual['emoji']}\n "
+            f"ha sacado un {resultado}.\n\n"
+            f"estaba en la casilla {posicion_actual} "
+            f"y necesitaba sacar exactamente "
+            f"{51 - posicion_actual} para llegar a 51.\n\n"
+            f"se ha pasado, así que permanece en la casilla "
+            f"{posicion_actual}. ⊹ ࣪ ˖"
+        )
+
+        await query.edit_message_text(text=texto)
+        await pasar_turno(context)
         return
 
     # =====================================================
@@ -2709,8 +2764,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         texto += (
-            f"\n\n🟣 ᛝ ¡AVANZA 3 CASILLAS!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f"\n\n🟣 ᛝ ¡AVANZA 3 CASILLAS! ⸜(｡˃ ᵕ ˂ )⸝\n"
             f"{usuario} {jugador_actual['emoji']} "
             f"avanza de la casilla 6 a la casilla 9."
         )

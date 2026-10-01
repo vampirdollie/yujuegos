@@ -2620,7 +2620,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
 
     texto = (
-        f"🎲 . . . {usuario} {jugador_actual['emoji']} "
+        f"🎲 . . . {usuario} {jugador_actual['emoji']}\n "
         f"ha sacado un {resultado}.\n\n"
         f"avanza de la casilla {posicion_actual} "
         f"a la casilla {nueva_posicion}."

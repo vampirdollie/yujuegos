@@ -2755,8 +2755,7 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         texto += (
-            f"\n\n🟣 ᛝ ¡ESCUDO!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f"\n\n🟣 ᛝ ¡ESCUDO! ⸜(｡˃ ᵕ ˂ )⸝\n"
             f"{usuario} {jugador_actual['emoji']} "
             f"ha conseguido un escudo. 🛡️"
         )
@@ -4462,7 +4461,15 @@ async def limpiarhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN
 # =========================================================
 
-app = Application.builder().token(TOKEN).build()
+app = (
+    Application.builder()
+    .token(TOKEN)
+    .connect_timeout(30)
+    .read_timeout(30)
+    .write_timeout(30)
+    .pool_timeout(30)
+    .build()
+)
 
 app.add_handler(
     CommandHandler("yustart", start)

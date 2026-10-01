@@ -2705,10 +2705,10 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             text=(
                 f"ꉂ(˵˃ ᗜ ˂˵) ᛝ "
-                f"¡{usuario} {jugador_actual['emoji']} "
+                f"¡{usuario} {jugador_actual['emoji']}\n "
                 f"ha llegado a la casilla 51!\n\n"
-                f"¡ha ganado la partida! 🎉\n\n"
-                f"premio: {partida['premio']} robux"
+                f"¡ha ganado la partida! 𖹭\n\n"
+                f"๑ premio: {partida['premio']} robux"
             )
         )
 

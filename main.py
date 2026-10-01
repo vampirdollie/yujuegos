@@ -2626,62 +2626,62 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"a la casilla {nueva_posicion}."
     )
 
-# =====================================================
-# CASILLA 51 — GANADOR
-# =====================================================
+    # =====================================================
+    # CASILLA 51 — GANADOR
+    # =====================================================
 
-if nueva_posicion >= 51:
+    if nueva_posicion >= 51:
 
-    # La posición final siempre es 51
-    jugador_actual["posicion"] = 51
+        # La posición final siempre es 51
+        jugador_actual["posicion"] = 51
 
-    try:
-        actualizar_jugador(
-            partida["id"],
-            jugador_actual
+        try:
+            actualizar_jugador(
+                partida["id"],
+                jugador_actual
+            )
+        except Exception as e:
+            logger.error(
+                f"ERROR ACTUALIZANDO GANADOR: {e}"
+            )
+
+        try:
+            guardar_ganador(
+                jugador_actual
+            )
+        except Exception as e:
+            logger.error(
+                f"ERROR GUARDANDO GANADOR: {e}"
+            )
+
+        # Mostrar primero la tirada
+        await query.edit_message_text(
+            text=texto
         )
-    except Exception as e:
-        logger.error(
-            f"ERROR ACTUALIZANDO GANADOR: {e}"
+
+        # Mostrar el ganador en un mensaje separado
+        await query.message.reply_text(
+            text=(
+                f"ꉂ(˵˃ ᗜ ˂˵) ᛝ "
+                f"¡{usuario} {jugador_actual['emoji']} "
+                f"ha llegado a la casilla 51!\n\n"
+                f"¡ha ganado la partida! 🎉\n\n"
+                f"premio: {partida['premio']} robux"
+            )
         )
 
-    try:
-        guardar_ganador(
-            jugador_actual
-        )
-    except Exception as e:
-        logger.error(
-            f"ERROR GUARDANDO GANADOR: {e}"
-        )
+        # Cerrar partida
+        partida["activa"] = False
+        partida["estado"] = "finalizada"
+        partida["retroceso"] = None
 
-    # Mostrar primero la tirada
-    await query.edit_message_text(
-        text=texto
-    )
+        # Cancelar temporizador actual
+        for job in context.job_queue.get_jobs_by_name(
+            f"turno_{partida['chat_id']}"
+        ):
+            job.schedule_removal()
 
-    # Mostrar el ganador en un mensaje separado
-    await query.message.reply_text(
-        text=(
-            f"ꉂ(˵˃ ᗜ ˂˵) ᛝ "
-            f"¡{usuario} {jugador_actual['emoji']} "
-            f"ha llegado a la casilla 51!\n\n"
-            f"¡ha ganado la partida! 🎉\n\n"
-            f"premio: {partida['premio']} robux"
-        )
-    )
-
-    # Cerrar partida
-    partida["activa"] = False
-    partida["estado"] = "finalizada"
-    partida["retroceso"] = None
-
-    # Cancelar temporizador actual
-    for job in context.job_queue.get_jobs_by_name(
-        f"turno_{partida['chat_id']}"
-    ):
-        job.schedule_removal()
-
-    return
+        return
 
     # =====================================================
     # ACTUALIZAR POSICIÓN

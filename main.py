@@ -21,6 +21,7 @@ from telegram.ext import (
     filters,
 )
 
+from telegram.ext import AIORateLimiter
 
 # =========================================================
 # CONFIGURACIÓN
@@ -4464,6 +4465,7 @@ async def limpiarhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = (
     Application.builder()
     .token(TOKEN)
+    .rate_limiter(AIORateLimiter(max_retries=2))
     .connect_timeout(30)
     .read_timeout(30)
     .write_timeout(30)

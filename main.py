@@ -2287,28 +2287,24 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # El premio debe ser mayor que 0
     if robux <= 0:
         await update.message.reply_text(
             "el premio debe ser mayor que 0."
         )
         return
 
-    # Mínimo 3 jugadores
-    if max_jugadores < 3:
+    if max_jugadores < 1:
         await update.message.reply_text(
             "el juego necesita mínimo 3 jugadores."
         )
         return
 
-    # Máximo 15 jugadores
     if max_jugadores > 15:
         await update.message.reply_text(
             "el juego permite máximo 15 jugadores."
         )
         return
 
-    # No permitir otra partida activa
     if partida["activa"]:
         await update.message.reply_text(
             "ups, ya hay una partida activa."
@@ -2329,6 +2325,10 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partida["mensaje_turno"] = None
     partida["retroceso"] = None
 
+    # IMPORTANTE:
+    # activar antes de guardar en Supabase
+    partida["activa"] = True
+
     # =====================================================
     # GUARDAR EN SUPABASE
     # =====================================================
@@ -2343,9 +2343,6 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"ERROR EN JUEGOMESA AL GUARDAR: {e}"
         )
 
-        # IMPORTANTE:
-        # si falla la base de datos,
-        # no dejamos una partida activa en memoria.
         partida["activa"] = False
         partida["chat_id"] = None
         partida["premio"] = 0
@@ -2366,8 +2363,6 @@ async def juegomesa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # =====================================================
     # PARTIDA CREADA CORRECTAMENTE
     # =====================================================
-
-    partida["activa"] = True
 
     logger.info(
         f"JUEGOMESA CREADO CORRECTAMENTE: "
@@ -2526,33 +2521,29 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Comprobar que exista una partida
     if not partida["activa"]:
         await update.message.reply_text(
             "🎲 ᛝ no hay ninguna partida activa."
         )
         return
 
-    # Comprobar que la partida siga esperando
     if partida["estado"] != "esperando":
         await update.message.reply_text(
             "🎲 ᛝ esta partida ya ha comenzado."
         )
         return
 
-    # Mínimo 3 jugadores
-    if len(partida["jugadores"]) < 3:
+    if len(partida["jugadores"]) < 1:
         await update.message.reply_text(
             "🎲 ᛝ se necesitan mínimo 3 jugadores para iniciar."
         )
         return
 
-    # Cambiar estado de la partida
+    # Cambiar estado
     partida["estado"] = "jugando"
     partida["turno"] = 0
     partida["turno_id"] += 1
 
-    # Crear lista de jugadores
     jugadores_texto = ""
 
     for jugador in partida["jugadores"]:
@@ -2566,20 +2557,18 @@ async def startjuego(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{usuario} {jugador['emoji']}\n"
         )
 
-    # Mensaje de inicio
     await update.message.reply_text(
         f"🎲 ᛝ ¡la partida ha comenzado!\n\n"
         f"{jugadores_texto}"
     )
 
-    # Enviar primer turno
     await enviar_turno(
         context,
         partida["turno_id"]
     )
 
 # =========================================================
-# BOTÓN: LANZAR DADO (VERSIÓN COMPLETA CORREGIDA)
+# BOTÓN: LANZAR DADO
 # =========================================================
 
 async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2587,139 +2576,279 @@ async def lanzar_dado(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
 
     if not partida["activa"]:
-        await query.answer("no hay una partida activa. (╥﹏╥)", show_alert=True)
+        await query.answer(
+            "no hay una partida activa. (╥﹏╥)",
+            show_alert=True
+        )
         return
 
     if partida["estado"] != "jugando":
-        await query.answer("la partida todavía no ha comenzado. (╥﹏╥)", show_alert=True)
+        await query.answer(
+            "la partida todavía no ha comenzado. (╥﹏╥)",
+            show_alert=True
+        )
         return
 
     jugador_actual = partida["jugadores"][partida["turno"]]
 
     if query.from_user.id != jugador_actual["id"]:
-        await query.answer("no es tu turno. (╥﹏╥)", show_alert=True)
+        await query.answer(
+            "no es tu turno. (╥﹏╥)",
+            show_alert=True
+        )
         return
 
     await query.answer()
+
     partida["turno_id"] += 1
 
     resultado = random.randint(1, 6)
+
     usuario = nombre_usuario(jugador_actual)
+
     posicion_actual = jugador_actual["posicion"]
+
     nueva_posicion = posicion_actual + resultado
 
-    # Botón de dado para reutilizar en casos especiales
-    boton_dado = InlineKeyboardButton("lanzar ‹𝟹", callback_data="juego:lanzar")
-    teclado = InlineKeyboardMarkup([[boton_dado]])
-
-    texto = (
-        f"🎲 . . . {usuario} {jugador_actual['emoji']}\n"
-        f"ha sacado un {resultado}.\n\n"
-        f"avanza de la casilla {posicion_actual} a la casilla {nueva_posicion}."
+    boton_dado = InlineKeyboardButton(
+        "lanzar ‹𝟹",
+        callback_data="juego:lanzar"
     )
 
-    # Casilla 51 — Ganador
-    if nueva_posicion == 51:
+    teclado = InlineKeyboardMarkup([
+        [boton_dado]
+    ])
+
+    texto = (
+        f"🎲 . . . {usuario} {jugador_actual['emoji']} "
+        f"ha sacado un {resultado}.\n\n"
+        f"avanza de la casilla {posicion_actual} "
+        f"a la casilla {nueva_posicion}."
+    )
+
+    # =====================================================
+    # CASILLA 51 — GANADOR
+    # =====================================================
+
+    if nueva_posicion >= 51:
+
+        # La posición final siempre es 51
+        jugador_actual["posicion"] = 51
+
         try:
-            guardar_ganador(jugador_actual)
+            actualizar_jugador(
+                partida["id"],
+                jugador_actual
+            )
         except Exception as e:
-            logger.error(f"ERROR GUARDANDO GANADOR: {e}")
+            logger.error(
+                f"ERROR ACTUALIZANDO GANADOR: {e}"
+            )
+
+        try:
+            guardar_ganador(
+                jugador_actual
+            )
+        except Exception as e:
+            logger.error(
+                f"ERROR GUARDANDO GANADOR: {e}"
+            )
 
         texto += (
-            f"\n\nꉂ(˵˃ ᗜ ˂˵) ᛝ ¡{usuario} {jugador_actual['emoji']} ha llegado a la casilla 51!\n\n"
+            f"\n\n"
+            f"ꉂ(˵˃ ᗜ ˂˵) ᛝ "
+            f"¡{usuario} {jugador_actual['emoji']} "
+            f"ha llegado a la casilla 51!\n\n"
             f"¡ha ganado la partida! 🎉\n\n"
             f"premio: {partida['premio']} robux"
         )
-        await query.edit_message_text(text=texto)
+
+        await query.edit_message_text(
+            text=texto
+        )
+
+        # Cerrar partida
         partida["activa"] = False
         partida["estado"] = "finalizada"
         partida["retroceso"] = None
+
+        # Cancelar temporizador actual
+        for job in context.job_queue.get_jobs_by_name(
+            f"turno_{partida['chat_id']}"
+        ):
+            job.schedule_removal()
+
         return
+
+    # =====================================================
+    # ACTUALIZAR POSICIÓN
+    # =====================================================
 
     jugador_actual["posicion"] = nueva_posicion
-    actualizar_jugador(partida["id"], jugador_actual)
 
-    # Casilla 6 — Avanza 3
+    actualizar_jugador(
+        partida["id"],
+        jugador_actual
+    )
+
+    # =====================================================
+    # CASILLA 6 — AVANZA 3
+    # =====================================================
+
     if jugador_actual["posicion"] == 6:
+
         jugador_actual["posicion"] = 9
-        actualizar_jugador(partida["id"], jugador_actual)
+
+        actualizar_jugador(
+            partida["id"],
+            jugador_actual
+        )
+
         texto += (
             f"\n\n🟣 ᛝ ¡AVANZA 3 CASILLAS!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n\n"
-            f"{usuario} {jugador_actual['emoji']} avanza de la casilla 6 a la casilla 9."
+            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f"{usuario} {jugador_actual['emoji']} "
+            f"avanza de la casilla 6 a la casilla 9."
         )
 
-    # Casilla 14 — Dado extra
+    # =====================================================
+    # CASILLA 14 — DADO EXTRA
+    # =====================================================
+
     if jugador_actual["posicion"] == 14:
+
         texto += (
             f"\n\n🟣 ᛝ ¡DADO EXTRA!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n\n"
-            f"{usuario} {jugador_actual['emoji']} tiene la oportunidad de lanzar otra vez."
+            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f"{usuario} {jugador_actual['emoji']} "
+            f"tiene la oportunidad de lanzar otra vez."
         )
-        await query.edit_message_text(text=texto, reply_markup=teclado)
+
+        await query.edit_message_text(
+            text=texto,
+            reply_markup=teclado
+        )
+
         partida["turno_id"] += 1
-        await enviar_turno(context, partida["turno_id"])
+
+        await enviar_turno(
+            context,
+            partida["turno_id"]
+        )
+
         return
 
-    # Casilla 26 — Escudo
+    # =====================================================
+    # CASILLA 26 — ESCUDO
+    # =====================================================
+
     if jugador_actual["posicion"] == 26:
+
         jugador_actual["escudo"] = True
-        actualizar_jugador(partida["id"], jugador_actual)
-        texto += (
-            f"\n\n🟣 ᛝ ¡ESCUDO!\n"
-            f" ⸜(｡˃ ᵕ ˂ )⸝\n\n"
-            f"{usuario} {jugador_actual['emoji']} ha conseguido un escudo. 🛡️"
+
+        actualizar_jugador(
+            partida["id"],
+            jugador_actual
         )
 
-    # Casilla 32 — Retroceso
+        texto += (
+            f"\n\n🟣 ᛝ ¡ESCUDO!\n"
+            f" ⸜(｡˃ ᵕ ˂ )⸝\n"
+            f"{usuario} {jugador_actual['emoji']} "
+            f"ha conseguido un escudo. 🛡️"
+        )
+
+    # =====================================================
+    # CASILLA 32 — RETROCESO
+    # =====================================================
+
     if jugador_actual["posicion"] == 32:
+
         texto += (
             f"\n\n🟠 ᛝ ¡LANZA DE NUEVO!\n"
-            f" (っ˕ -｡)\n\n"
-            f"{usuario} {jugador_actual['emoji']} debe lanzar otra vez y retroceder esa cantidad. :("
+            f" (っ˕ -｡)\n"
+            f"{usuario} {jugador_actual['emoji']} "
+            f"debe lanzar otra vez y retroceder esa cantidad. :("
         )
-        await query.edit_message_text(text=texto, reply_markup=teclado)
+
         partida["retroceso"] = {
             "jugador_id": jugador_actual["id"],
             "atacante_id": jugador_actual["id"],
             "turno_id": partida["turno_id"]
         }
-        return
 
-    # Casilla 46 — Pierde turno
-    if jugador_actual["posicion"] == 46:
-        jugador_actual["perder_turno"] = True
-        actualizar_jugador(partida["id"], jugador_actual)
-        texto += (
-            f"\n\n🟠 ᛝ ¡OH, NO!\n"
-            f" (っ˕ -｡)\n\n"
-            f"{usuario} {jugador_actual['emoji']} pierde su siguiente turno. :("
+        await query.edit_message_text(
+            text=texto,
+            reply_markup=teclado
         )
 
-    # Mostrar mensaje final del turno
-    await query.edit_message_text(text=texto)
+        return
 
-    # Casilla 20 — Elegir jugador
+    # =====================================================
+    # CASILLA 46 — PIERDE TURNO
+    # =====================================================
+
+    if jugador_actual["posicion"] == 46:
+
+        jugador_actual["perder_turno"] = True
+
+        actualizar_jugador(
+            partida["id"],
+            jugador_actual
+        )
+
+        texto += (
+            f"\n\n🟠 ᛝ ¡OH, NO!\n"
+            f" (っ˕ -｡)\n"
+            f"{usuario} {jugador_actual['emoji']} "
+            f"pierde su siguiente turno. :("
+        )
+
+    # =====================================================
+    # MOSTRAR RESULTADO
+    # =====================================================
+
+    await query.edit_message_text(
+        text=texto
+    )
+
+    # =====================================================
+    # CASILLA 20 — ELEGIR JUGADOR
+    # =====================================================
+
     if jugador_actual["posicion"] == 20:
+
         botones = []
+
         for jugador in partida["jugadores"]:
+
             if jugador["id"] == jugador_actual["id"]:
                 continue
+
             botones.append([
                 InlineKeyboardButton(
                     f"{nombre_usuario(jugador)} {jugador['emoji']}",
                     callback_data=f"juego:retroceder:{jugador['id']}"
                 )
             ])
-        teclado = InlineKeyboardMarkup(botones)
+
+        teclado = InlineKeyboardMarkup(
+            botones
+        )
+
         await query.message.reply_text(
             f"🟠 ᛝ ¡ELIGES QUE ALGUIEN RETROCEDA! (っ˕ -｡)\n\n"
-            f"{usuario} {jugador_actual['emoji']}, elige a quién hacer retroceder.",
+            f"{usuario} {jugador_actual['emoji']}, "
+            f"elige a quién hacer retroceder.",
             reply_markup=teclado
         )
+
         return
 
-    # Pasar turno
+    # =====================================================
+    # PASAR TURNO
+    # =====================================================
+
     await pasar_turno(context)
 
 # =========================================================
@@ -2787,9 +2916,8 @@ async def pasar_turno(context: ContextTypes.DEFAULT_TYPE):
         partida["turno_id"]
     )
 
-
 # =========================================================
-# ENVIAR TURNO (SIN BOTÓN INICIAL)
+# ENVIAR TURNO
 # =========================================================
 
 async def enviar_turno(
@@ -2798,7 +2926,14 @@ async def enviar_turno(
 ):
 
     jugador = partida["jugadores"][partida["turno"]]
+
     usuario = nombre_usuario(jugador)
+
+    # Cancelar jobs anteriores del turno
+    for job in context.job_queue.get_jobs_by_name(
+        f"turno_{partida['chat_id']}"
+    ):
+        job.schedule_removal()
 
     # =====================================================
     # PERDER TURNO
@@ -2823,10 +2958,11 @@ async def enviar_turno(
         )
 
         await pasar_turno(context)
+
         return
 
     # =====================================================
-    # BOTÓN PARA LANZAR
+    # BOTÓN
     # =====================================================
 
     boton_dado = InlineKeyboardButton(
@@ -2839,7 +2975,7 @@ async def enviar_turno(
     ])
 
     # =====================================================
-    # MENSAJE DEL TURNO (ÚNICO)
+    # MENSAJE DEL TURNO
     # =====================================================
 
     mensaje = await context.bot.send_message(
@@ -2850,23 +2986,19 @@ async def enviar_turno(
         ),
         reply_markup=teclado
     )
+
     partida["mensaje_turno"] = mensaje.message_id
 
     # =====================================================
-    # CANCELAR JOBS ANTERIORES
-    # =====================================================
-
-    for job in context.job_queue.get_jobs_by_name(f"turno_{partida['chat_id']}"):
-        job.schedule_removal()
-
-    # =====================================================
-    # TEMPORIZADOR DE 1 MINUTO (ÚNICO)
+    # TEMPORIZADOR
     # =====================================================
 
     context.job_queue.run_once(
         tiempo_agotado,
         60,
-        data={"turno_id": turno_id},
+        data={
+            "turno_id": turno_id
+        },
         name=f"turno_{partida['chat_id']}"
     )
     

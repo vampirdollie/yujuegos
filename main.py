@@ -4024,7 +4024,7 @@ async def jugar_reflejos(
         usuario = jugador["nombre"]
 
     # Responder al botón
-    await query.answer("⚡ ¡CORRECTO! ¡GANASTE! ♡", show_alert=True)
+    await query.answer("⚡ ¡CORRECTO! ¡GANASTE! 𖹭", show_alert=True)
 
     # =====================================================
     # GUARDAR GANADOR

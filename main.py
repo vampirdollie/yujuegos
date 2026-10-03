@@ -368,6 +368,7 @@ def guardar_ganador_ruleta(jugador, premio):
         conn = _get_conn()
         cur = conn.cursor()
 
+        # Guardar ganador de ruleta
         cur.execute("""
             INSERT INTO ganadores_ruleta (
                 ruleta_id,
@@ -385,6 +386,24 @@ def guardar_ganador_ruleta(jugador, premio):
             jugador["nombre"],
             jugador["username"],
             premio
+        ))
+
+        # Guardar también en historial compartido
+        cur.execute("""
+            INSERT INTO historial_robux (
+                user_id,
+                username,
+                premio,
+                origen,
+                juego
+            )
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            jugador["id"],
+            jugador["username"],
+            premio,
+            "yujuegos",
+            "ruleta"
         ))
 
         conn.commit()
@@ -422,6 +441,7 @@ def guardar_ganador_reflejos(jugador, premio):
         conn = _get_conn()
         cur = conn.cursor()
 
+        # Guardar en tabla actual de reflejos
         cur.execute("""
             INSERT INTO ganadores_ruleta (
                 ruleta_id,
@@ -440,6 +460,24 @@ def guardar_ganador_reflejos(jugador, premio):
             jugador["nombre"],
             jugador["username"],
             premio,
+            "reflejos"
+        ))
+
+        # Guardar también en historial compartido
+        cur.execute("""
+            INSERT INTO historial_robux (
+                user_id,
+                username,
+                premio,
+                origen,
+                juego
+            )
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            jugador["id"],
+            jugador["username"],
+            premio,
+            "yujuegos",
             "reflejos"
         ))
 
@@ -569,6 +607,9 @@ def guardar_ganador(jugador):
         conn = _get_conn()
         cur = conn.cursor()
 
+        premio = partida["premio"]
+
+        # Guardar ganador del juego de mesa
         cur.execute("""
             INSERT INTO ganadores (
                 partida_id,
@@ -587,7 +628,25 @@ def guardar_ganador(jugador):
             jugador["nombre"],
             jugador["username"],
             jugador["emoji"],
-            partida["premio"]
+            premio
+        ))
+
+        # Guardar también en historial compartido
+        cur.execute("""
+            INSERT INTO historial_robux (
+                user_id,
+                username,
+                premio,
+                origen,
+                juego
+            )
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            jugador["id"],
+            jugador["username"],
+            premio,
+            "yujuegos",
+            "mesa"
         ))
 
         conn.commit()
@@ -595,7 +654,7 @@ def guardar_ganador(jugador):
         logger.info(
             f"GANADOR GUARDADO: "
             f"user_id={jugador['id']} "
-            f"premio={partida['premio']}"
+            f"premio={premio}"
         )
 
     except Exception as e:

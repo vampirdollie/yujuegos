@@ -392,14 +392,16 @@ def guardar_ganador_ruleta(jugador, premio):
         cur.execute("""
             INSERT INTO historial_robux (
                 user_id,
+                nombre,
                 username,
                 premio,
                 origen,
                 juego
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             jugador["id"],
+            jugador["nombre"],
             jugador["username"],
             premio,
             "yujuegos",
@@ -467,14 +469,16 @@ def guardar_ganador_reflejos(jugador, premio):
         cur.execute("""
             INSERT INTO historial_robux (
                 user_id,
+                nombre,
                 username,
                 premio,
                 origen,
                 juego
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             jugador["id"],
+            jugador["nombre"],
             jugador["username"],
             premio,
             "yujuegos",
@@ -635,14 +639,16 @@ def guardar_ganador(jugador):
         cur.execute("""
             INSERT INTO historial_robux (
                 user_id,
+                nombre,
                 username,
                 premio,
                 origen,
                 juego
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             jugador["id"],
+            jugador["nombre"],
             jugador["username"],
             premio,
             "yujuegos",
@@ -4413,68 +4419,63 @@ async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn = _get_conn()
         cur = conn.cursor()
 
-        # Unificar ganadores de mesa, ruleta y reflejos
+        # Leer historial compartido
         cur.execute("""
             SELECT
                 user_id,
                 nombre,
                 username,
-                tipo,
+                juego AS tipo,
                 SUM(premio) AS total
-            FROM (
-                SELECT
-                    g.user_id,
-                    g.nombre,
-                    g.username,
-                    'mesa' AS tipo,
-                    g.premio
-                FROM ganadores g
-                UNION ALL
-                SELECT
-                    gr.user_id,
-                    gr.nombre,
-                    gr.username,
-                    COALESCE(gr.tipo, 'ruleta') AS tipo,
-                    gr.premio
-                FROM ganadores_ruleta gr
-            ) AS todos
-            GROUP BY user_id, nombre, username, tipo
+            FROM historial_robux
+            GROUP BY user_id, nombre, username, juego
             ORDER BY total DESC
         """)
 
         resultados = cur.fetchall()
 
     except Exception as e:
-        logger.error(f"ERROR consultando historial: {e}")
+
+        logger.error(
+            f"ERROR consultando historial: {e}"
+        )
+
         await update.message.reply_text(
             "๑ ᛝ ocurrió un error al consultar el historial."
         )
+
         return
 
     finally:
+
         if cur:
             cur.close()
+
         if conn:
             conn.close()
 
     # =====================================================
     # SIN GANADORES
     # =====================================================
+
     if not resultados:
+
         await update.message.reply_text(
             "๑ ᛝ todavía no hay ganadores registrados."
         )
+
         return
 
     # =====================================================
     # CREAR MENSAJE
     # =====================================================
+
     texto = "⠀⠀𖹭 ⠀⠀⠀𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹 acumulado\n\n"
 
-    # Diccionario para acumular totales por jugador
     acumulados = {}
 
     for resultado in resultados:
+
         user_id, nombre, username, tipo, total = resultado
 
         if username:
@@ -4483,22 +4484,38 @@ async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
             usuario = nombre
 
         if user_id not in acumulados:
+
             acumulados[user_id] = {
                 "usuario": usuario,
                 "detalles": [],
                 "total": 0
             }
 
-        acumulados[user_id]["detalles"].append(f"{tipo}: {total} robux")
+        acumulados[user_id]["detalles"].append(
+            f"{tipo}: {total} robux"
+        )
+
         acumulados[user_id]["total"] += total
 
-    # Construir texto final
+    # =====================================================
+    # CONSTRUIR TEXTO FINAL
+    # =====================================================
+
     total_general = 0
+
     for jugador in acumulados.values():
-        texto += f"๑ {jugador['usuario']} → {jugador['total']} robux\n"
+
+        texto += (
+            f"๑ {jugador['usuario']} → "
+            f"{jugador['total']} robux\n"
+        )
+
         for detalle in jugador["detalles"]:
+
             texto += f"   {detalle}\n"
+
         texto += "\n"
+
         total_general += jugador["total"]
 
     texto += f"𖹭 Total: {total_general} robux"
@@ -4534,15 +4551,9 @@ async def limpiarhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn = _get_conn()
         cur = conn.cursor()
 
-        # Limpiar historial de ruleta
+        # Limpiar historial
         cur.execute(
-            "DELETE FROM ganadores_ruleta WHERE chat_id = %s",
-            (update.effective_chat.id,)
-        )
-
-        # Limpiar historial de juegomesa
-        cur.execute(
-            "DELETE FROM ganadores"
+            "DELETE FROM historial_robux"
         )
 
         conn.commit()

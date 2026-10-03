@@ -3882,7 +3882,7 @@ async def elegir_correcto_reflejos(
         )
         return
 
-    # Comprobar que el emoji esté entre los 5
+    # Comprobar que el emoji esté entre los emojis
     if emoji_correcto not in reflejos["emojis"]:
         await query.answer(
             "ese emoji no pertenece a este juego.",
@@ -3919,7 +3919,7 @@ async def elegir_correcto_reflejos(
     teclado = InlineKeyboardMarkup(botones)
 
     # =====================================================
-    # ENVIAR JUEGO AL GRUPO
+    # PUBLICAR JUEGO EN EL GRUPO
     # =====================================================
 
     try:
@@ -3953,7 +3953,7 @@ async def elegir_correcto_reflejos(
         reflejos["admin_id"] = None
         reflejos["mensaje_id"] = None
 
-        await query.message.reply_text(
+        await query.edit_message_text(
             "⚡ ᛝ ocurrió un error al publicar "
             "el juego en el grupo."
         )
@@ -3961,10 +3961,10 @@ async def elegir_correcto_reflejos(
         return
 
     # =====================================================
-    # CONFIRMACIÓN PRIVADA AL ADMIN
+    # EDITAR EL MENSAJE DE CONFIGURACIÓN
     # =====================================================
 
-    await query.message.reply_text(
+    await query.edit_message_text(
         "⚡ ᛝ ¡listo!\n"
         "el juego ya fue publicado en el grupo. 𖹭"
     )
@@ -4475,9 +4475,15 @@ async def limpiarhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn = _get_conn()
         cur = conn.cursor()
 
+        # Limpiar historial de ruleta
         cur.execute(
             "DELETE FROM ganadores_ruleta WHERE chat_id = %s",
             (update.effective_chat.id,)
+        )
+
+        # Limpiar historial de juegomesa
+        cur.execute(
+            "DELETE FROM ganadores"
         )
 
         conn.commit()

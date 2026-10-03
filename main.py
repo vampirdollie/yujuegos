@@ -4470,7 +4470,7 @@ async def yuhistorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # CREAR MENSAJE
     # =====================================================
 
-    texto = "⠀⠀𖹭 ⠀⠀⠀𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹 acumulado\n\n"
+    texto = "⠀⠀𖹭⠀⠀𝗛𝗶𝘀𝘁𝗼𝗿𝗶𝗮𝗹 acumulado\n\n"
 
     acumulados = {}
 
